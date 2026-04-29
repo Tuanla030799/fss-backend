@@ -1,0 +1,14 @@
+.git
+.idea
+.gradle
+build
+logs
+uploads
+tmp
+dist
+bin
+*.log
+*.iml
+.DS_Store
+.env
+.codex

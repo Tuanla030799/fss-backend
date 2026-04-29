@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.fss.backend.catalog.category.CategoryMapper">
+    <select id="listCategories" resultType="com.fss.backend.catalog.category.Category">
+        SELECT id, parent_id, name, slug, description, status, sort_order, created_at
+        FROM categories
+        <where>
+            deleted_at IS NULL
+            <if test="status != null and status != ''">AND status = #{status}</if>
+            <if test="keyword != null and keyword != ''">AND (name ILIKE CONCAT('%', #{keyword}, '%') OR slug ILIKE CONCAT('%', #{keyword}, '%'))</if>
+        </where>
+        ORDER BY sort_order ASC, created_at DESC
+    </select>
+    <select id="findCategoryById" resultType="com.fss.backend.catalog.category.Category">
+        SELECT id, parent_id, name, slug, description, status, sort_order, created_at FROM categories WHERE id=#{id} AND deleted_at IS NULL
+    </select>
+    <select id="findCategoryBySlug" resultType="com.fss.backend.catalog.category.Category">
+        SELECT id, parent_id, name, slug, description, status, sort_order, created_at FROM categories WHERE slug=#{slug} AND deleted_at IS NULL
+    </select>
+    <select id="countCategorySlug" resultType="int">
+        SELECT COUNT(*) FROM categories WHERE slug=#{slug} AND deleted_at IS NULL <if test="excludeId != null">AND id != #{excludeId}</if>
+    </select>
+    <insert id="insertCategory">
+        INSERT INTO categories(id,parent_id,name,slug,description,status,sort_order,created_by,updated_by)
+        VALUES(#{id},#{parentId},#{name},#{slug},#{description},#{status},#{sortOrder},#{adminId},#{adminId})
+    </insert>
+    <update id="updateCategory">
+        UPDATE categories SET parent_id=#{parentId}, name=#{name}, slug=#{slug}, description=#{description}, status=#{status}, sort_order=#{sortOrder}, updated_by=#{adminId} WHERE id=#{id}
+    </update>
+    <update id="softDeleteCategory">UPDATE categories SET deleted_at=now(), updated_by=#{adminId} WHERE id=#{id}</update>
+</mapper>

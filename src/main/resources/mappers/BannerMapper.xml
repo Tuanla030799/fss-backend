@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.fss.backend.content.banner.BannerMapper">
+    <select id="listBanners" resultType="com.fss.backend.content.banner.LandingBanner">
+        SELECT b.id,b.title,b.subtitle,b.link_url,b.file_id,f.path AS image_url,b.status,b.sort_order,b.starts_at,b.ends_at,b.created_at
+        FROM landing_banners b LEFT JOIN files f ON f.id=b.file_id
+        <where>b.deleted_at IS NULL <if test="publicOnly">AND b.status='ACTIVE' AND (b.starts_at IS NULL OR b.starts_at &lt;= now()) AND (b.ends_at IS NULL OR b.ends_at &gt;= now())</if><if test="status != null and status != ''">AND b.status=#{status}</if></where>
+        ORDER BY b.sort_order ASC, b.created_at DESC
+    </select>
+    <select id="findBannerById" resultType="com.fss.backend.content.banner.LandingBanner">
+        SELECT b.id,b.title,b.subtitle,b.link_url,b.file_id,f.path AS image_url,b.status,b.sort_order,b.starts_at,b.ends_at,b.created_at FROM landing_banners b LEFT JOIN files f ON f.id=b.file_id WHERE b.id=#{id} AND b.deleted_at IS NULL
+    </select>
+    <insert id="insertBanner">INSERT INTO landing_banners(id,title,subtitle,link_url,file_id,status,sort_order,starts_at,ends_at,created_by,updated_by) VALUES(#{id},#{title},#{subtitle},#{linkUrl},#{fileId},#{status},#{sortOrder},#{startsAt},#{endsAt},#{adminId},#{adminId})</insert>
+    <update id="updateBanner">UPDATE landing_banners SET title=#{title},subtitle=#{subtitle},link_url=#{linkUrl},file_id=#{fileId},status=#{status},sort_order=#{sortOrder},starts_at=#{startsAt},ends_at=#{endsAt},updated_by=#{adminId} WHERE id=#{id}</update>
+    <update id="softDeleteBanner">UPDATE landing_banners SET deleted_at=now(), updated_by=#{adminId} WHERE id=#{id}</update>
+</mapper>

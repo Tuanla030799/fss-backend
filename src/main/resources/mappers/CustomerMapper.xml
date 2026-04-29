@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.fss.backend.customer.CustomerMapper">
+    <select id="listCustomers" resultType="com.fss.backend.customer.Customer">
+        SELECT id, full_name, email, phone, status, created_at
+        FROM customers
+        <where>
+            deleted_at IS NULL
+            <if test="status != null and status != ''">AND status=#{status}</if>
+            <if test="keyword != null and keyword != ''">AND (full_name ILIKE CONCAT('%',#{keyword},'%') OR email ILIKE CONCAT('%',#{keyword},'%') OR phone ILIKE CONCAT('%',#{keyword},'%'))</if>
+        </where>
+        ORDER BY created_at DESC LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <select id="findCustomerById" resultType="com.fss.backend.customer.Customer">
+        SELECT id, full_name, email, phone, status, created_at FROM customers WHERE id=#{id} AND deleted_at IS NULL
+    </select>
+    <select id="countEmail" resultType="int">
+        SELECT COUNT(*) FROM customers WHERE LOWER(email)=LOWER(#{email}) AND deleted_at IS NULL <if test="excludeId != null">AND id != #{excludeId}</if>
+    </select>
+    <select id="countPhone" resultType="int">
+        SELECT COUNT(*) FROM customers WHERE phone=#{phone} AND deleted_at IS NULL <if test="excludeId != null">AND id != #{excludeId}</if>
+    </select>
+    <insert id="insertCustomer">
+        INSERT INTO customers(id,full_name,email,phone,status) VALUES(#{id},#{fullName},#{email},#{phone},#{status})
+    </insert>
+    <update id="updateCustomer">
+        UPDATE customers SET full_name=#{fullName}, email=#{email}, phone=#{phone}, status=#{status} WHERE id=#{id}
+    </update>
+    <update id="softDeleteCustomer">UPDATE customers SET deleted_at=now(), status='INACTIVE' WHERE id=#{id}</update>
+</mapper>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.fss.backend.auth.AuthMapper">
+    <select id="findAdminByEmail" resultType="com.fss.backend.auth.AdminUser">
+        SELECT id, name, email, password_hash, role, created_at FROM admin_users WHERE email = #{email} AND status = 'ACTIVE' AND deleted_at IS NULL
+    </select>
+
+    <select id="findAdminById" resultType="com.fss.backend.auth.AdminUser">
+        SELECT id, name, email, password_hash, role, created_at FROM admin_users WHERE id = #{id} AND status = 'ACTIVE' AND deleted_at IS NULL
+    </select>
+
+    <insert id="insertAdmin">
+        INSERT INTO admin_users(id, name, email, password_hash, role)
+        VALUES(#{id}, #{name}, #{email}, #{passwordHash}, #{role})
+    </insert>
+
+    <insert id="insertRefreshToken">
+        INSERT INTO refresh_tokens(id, admin_id, token, expires_at)
+        VALUES(#{id}, #{adminId}, #{token}, #{expiresAt})
+    </insert>
+
+    <select id="findAdminIdByRefreshToken" resultType="java.util.UUID">
+        SELECT admin_id FROM refresh_tokens
+        WHERE token = #{token} AND revoked_at IS NULL AND expires_at > now()
+    </select>
+
+    <update id="deleteRefreshToken">
+        UPDATE refresh_tokens SET revoked_at = now() WHERE token = #{token}
+    </update>
+</mapper>

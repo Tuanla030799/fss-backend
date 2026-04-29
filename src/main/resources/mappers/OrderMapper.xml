@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.fss.backend.sales.order.OrderMapper">
+    <select id="findSkuForOrder" resultType="com.fss.backend.catalog.sku.SkuForOrder">
+        SELECT s.id, s.product_id, s.variant_id, s.sku_code, s.size, s.price, s.sale_price, s.stock, s.status, p.name AS product_name, v.name AS variant_name
+        FROM skus s JOIN products p ON p.id=s.product_id LEFT JOIN product_variants v ON v.id=s.variant_id
+        WHERE s.id=#{id} AND s.deleted_at IS NULL AND p.deleted_at IS NULL AND p.status='ACTIVE' AND s.status='ACTIVE'
+    </select>
+    <update id="decrementStock">UPDATE skus SET stock=stock-#{quantity} WHERE id=#{skuId} AND stock &gt;= #{quantity} AND deleted_at IS NULL</update>
+    <insert id="insertOrder">INSERT INTO orders(id,order_code,customer_name,customer_phone,customer_email,shipping_address,note,status,coupon_id,customer_id,payment_method,shipping_method,subtotal_amount,discount_amount,shipping_fee,total_amount) VALUES(#{id},#{orderCode},#{customerName},#{customerPhone},#{customerEmail},#{shippingAddress},#{note},#{status},#{couponId},#{customerId},#{paymentMethod},#{shippingMethod},#{subtotalAmount},#{discountAmount},#{shippingFee},#{totalAmount})</insert>
+    <insert id="insertOrderItem">INSERT INTO order_items(id,order_id,sku_id,product_name,sku_code,variant_name,size,unit_price,quantity,line_total) VALUES(#{id},#{orderId},#{skuId},#{productName},#{skuCode},#{variantName},#{size},#{unitPrice},#{quantity},#{lineTotal})</insert>
+    <select id="listOrders" resultType="com.fss.backend.sales.order.Order">SELECT * FROM orders <where>deleted_at IS NULL <if test="status != null and status != ''">AND status=#{status}</if><if test="keyword != null and keyword != ''">AND (order_code ILIKE CONCAT('%',#{keyword},'%') OR customer_name ILIKE CONCAT('%',#{keyword},'%') OR customer_phone ILIKE CONCAT('%',#{keyword},'%'))</if></where> ORDER BY created_at DESC LIMIT #{limit} OFFSET #{offset}</select>
+    <select id="findOrderById" resultType="com.fss.backend.sales.order.Order">SELECT *FROM orders WHERE id=#{id}AND deleted_at IS NULL</select>
+    <select id="listOrderItems" resultType="com.fss.backend.sales.order.OrderItem">SELECT *FROM order_items WHERE order_id=#{orderId}ORDER BY created_at ASC</select>
+    <update id="updateOrderStatus">UPDATE orders SET status=#{status} WHERE id=#{id}</update>
+    <update id="updatePayment">UPDATE orders SET payment_method=#{paymentMethod}, payment_status=#{paymentStatus}, paid_at=#{paidAt} WHERE id=#{id}</update>
+    <update id="updateShipping">UPDATE orders SET shipping_method=#{shippingMethod}, shipping_status=#{shippingStatus}, tracking_code=#{trackingCode} WHERE id=#{id}</update>
+    <insert id="insertStatusHistory">INSERT INTO order_status_history(id,order_id,old_status,new_status,note,created_by) VALUES(#{id},#{orderId},#{oldStatus},#{newStatus},#{note},#{createdBy})</insert>
+    <select id="listStatusHistory" resultType="com.fss.backend.sales.order.OrderStatusHistory">SELECT id,order_id,old_status,new_status,note,created_by,created_at FROM order_status_history WHERE order_id=#{orderId} ORDER BY created_at DESC</select>
+</mapper>

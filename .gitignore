@@ -1,0 +1,20 @@
+.codex
+.env
+tmp/
+dist/
+bin/
+*.log
+logs/
+
+# Gradle
+.gradle/
+build/
+springboot-backend/
+
+# Runtime data
+uploads/
+
+# Local editor / OS noise
+.idea/
+*.iml
+.DS_Store
