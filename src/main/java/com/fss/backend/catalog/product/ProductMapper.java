@@ -13,6 +13,8 @@ import java.util.UUID;
 public interface ProductMapper {
     List<ProductSummary> listProducts(@Param("publicOnly") boolean publicOnly, @Param("status") String status,
                                       @Param("categoryId") UUID categoryId, @Param("categorySlug") String categorySlug,
+                                      @Param("brandId") UUID brandId, @Param("brandSlug") String brandSlug,
+                                      @Param("gender") String gender,
                                       @Param("keyword") String keyword, @Param("size") String size,
                                       @Param("color") String color, @Param("minPrice") BigDecimal minPrice,
                                       @Param("maxPrice") BigDecimal maxPrice, @Param("featuredOnly") boolean featuredOnly,
@@ -21,12 +23,14 @@ public interface ProductMapper {
     String findProductDescriptionJson(@Param("id") UUID id);
     ProductSummary findProductSummaryBySlug(@Param("slug") String slug, @Param("publicOnly") boolean publicOnly);
     int countProductSlug(@Param("slug") String slug, @Param("excludeId") UUID excludeId);
-    void insertProduct(@Param("id") UUID id, @Param("categoryId") UUID categoryId, @Param("name") String name,
+    void insertProduct(@Param("id") UUID id, @Param("categoryId") UUID categoryId, @Param("brandId") UUID brandId,
+                       @Param("gender") String gender, @Param("name") String name,
                        @Param("slug") String slug, @Param("shortDescription") String shortDescription,
                        @Param("descriptionJson") String descriptionJson, @Param("status") String status,
                        @Param("isFeatured") Boolean isFeatured, @Param("featuredOrder") Integer featuredOrder,
                        @Param("adminId") UUID adminId);
-    void updateProduct(@Param("id") UUID id, @Param("categoryId") UUID categoryId, @Param("name") String name,
+    void updateProduct(@Param("id") UUID id, @Param("categoryId") UUID categoryId, @Param("brandId") UUID brandId,
+                       @Param("gender") String gender, @Param("name") String name,
                        @Param("slug") String slug, @Param("shortDescription") String shortDescription,
                        @Param("descriptionJson") String descriptionJson, @Param("status") String status,
                        @Param("isFeatured") Boolean isFeatured, @Param("featuredOrder") Integer featuredOrder,
@@ -64,4 +68,3 @@ public interface ProductMapper {
                    @Param("salePrice") BigDecimal salePrice, @Param("stock") Integer stock, @Param("status") String status);
     void softDeleteSku(@Param("id") UUID id, @Param("productId") UUID productId);
 }
-

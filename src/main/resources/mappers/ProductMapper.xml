@@ -2,7 +2,8 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.fss.backend.catalog.product.ProductMapper">
     <sql id="productSummarySelect">
-        p.id, p.category_id, c.name AS category_name, p.name, p.slug, p.short_description, p.status, p.is_featured,
+        p.id, p.category_id, c.name AS category_name, p.brand_id, b.name AS brand_name, b.slug AS brand_slug, p.gender,
+        p.name, p.slug, p.short_description, p.status, p.is_featured,
         p.featured_order, MIN(s.price) AS min_price, MIN(COALESCE(s.sale_price, s.price)) AS min_sale_price,
         COALESCE(SUM(s.stock), 0)::int AS total_stock,
         (ARRAY_AGG(pi.file_id ORDER BY pi.is_primary DESC, pi.sort_order ASC) FILTER (WHERE pi.file_id IS NOT NULL))[1] AS primary_file_id,
@@ -14,15 +15,19 @@
         SELECT <include refid="productSummarySelect" />
         FROM products p
         JOIN categories c ON c.id = p.category_id
+        LEFT JOIN brands b ON b.id = p.brand_id
         LEFT JOIN skus s ON s.product_id = p.id AND s.deleted_at IS NULL
         LEFT JOIN product_images pi ON pi.product_id = p.id
         LEFT JOIN files f ON f.id = pi.file_id
         <where>
             p.deleted_at IS NULL
-            <if test="publicOnly">AND p.status = 'ACTIVE' AND c.status = 'ACTIVE' AND c.deleted_at IS NULL</if>
+            <if test="publicOnly">AND p.status = 'ACTIVE' AND c.status = 'ACTIVE' AND c.deleted_at IS NULL AND (b.id IS NULL OR (b.status = 'ACTIVE' AND b.deleted_at IS NULL))</if>
             <if test="status != null and status != ''">AND p.status = #{status}</if>
             <if test="categoryId != null">AND p.category_id = #{categoryId}</if>
             <if test="categorySlug != null and categorySlug != ''">AND c.slug = #{categorySlug}</if>
+            <if test="brandId != null">AND p.brand_id = #{brandId}</if>
+            <if test="brandSlug != null and brandSlug != ''">AND b.slug = #{brandSlug}</if>
+            <if test="gender != null and gender != ''">AND p.gender = #{gender}</if>
             <if test="keyword != null and keyword != ''">AND (p.name ILIKE CONCAT('%', #{keyword}, '%') OR p.short_description ILIKE CONCAT('%', #{keyword}, '%'))</if>
             <if test="featuredOnly">AND p.is_featured = true</if>
             <if test="size != null and size != ''">AND EXISTS (SELECT 1 FROM skus sx WHERE sx.product_id=p.id AND sx.deleted_at IS NULL AND sx.size=#{size})</if>
@@ -30,7 +35,7 @@
             <if test="minPrice != null">AND EXISTS (SELECT 1 FROM skus sp WHERE sp.product_id=p.id AND sp.deleted_at IS NULL AND COALESCE(sp.sale_price, sp.price) &gt;= #{minPrice})</if>
             <if test="maxPrice != null">AND EXISTS (SELECT 1 FROM skus sp WHERE sp.product_id=p.id AND sp.deleted_at IS NULL AND COALESCE(sp.sale_price, sp.price) &lt;= #{maxPrice})</if>
         </where>
-        GROUP BY p.id, c.name
+        GROUP BY p.id, c.name, b.name, b.slug
         ORDER BY <if test="featuredOnly">p.featured_order ASC,</if> p.created_at DESC
         LIMIT #{limit} OFFSET #{offset}
     </select>
@@ -40,30 +45,32 @@
     <select id="findProductSummaryById" resultType="com.fss.backend.catalog.product.ProductSummary">
         SELECT <include refid="productSummarySelect" />
         FROM products p JOIN categories c ON c.id=p.category_id
+        LEFT JOIN brands b ON b.id=p.brand_id
         LEFT JOIN skus s ON s.product_id=p.id AND s.deleted_at IS NULL
         LEFT JOIN product_images pi ON pi.product_id=p.id
         LEFT JOIN files f ON f.id=pi.file_id
         WHERE p.id=#{id} AND p.deleted_at IS NULL
-        GROUP BY p.id, c.name
+        GROUP BY p.id, c.name, b.name, b.slug
     </select>
     <select id="findProductSummaryBySlug" resultType="com.fss.backend.catalog.product.ProductSummary">
         SELECT <include refid="productSummarySelect" />
         FROM products p JOIN categories c ON c.id=p.category_id
+        LEFT JOIN brands b ON b.id=p.brand_id
         LEFT JOIN skus s ON s.product_id=p.id AND s.deleted_at IS NULL
         LEFT JOIN product_images pi ON pi.product_id=p.id
         LEFT JOIN files f ON f.id=pi.file_id
-        WHERE p.slug=#{slug} AND p.deleted_at IS NULL <if test="publicOnly">AND p.status='ACTIVE' AND c.status='ACTIVE'</if>
-        GROUP BY p.id, c.name
+        WHERE p.slug=#{slug} AND p.deleted_at IS NULL <if test="publicOnly">AND p.status='ACTIVE' AND c.status='ACTIVE' AND (b.id IS NULL OR (b.status='ACTIVE' AND b.deleted_at IS NULL))</if>
+        GROUP BY p.id, c.name, b.name, b.slug
     </select>
     <select id="countProductSlug" resultType="int">
         SELECT COUNT(*) FROM products WHERE slug=#{slug} AND deleted_at IS NULL <if test="excludeId != null">AND id != #{excludeId}</if>
     </select>
     <insert id="insertProduct">
-        INSERT INTO products(id,category_id,name,slug,short_description,description_json,status,is_featured,featured_order,created_by,updated_by)
-        VALUES(#{id},#{categoryId},#{name},#{slug},#{shortDescription},CAST(#{descriptionJson} AS jsonb),#{status},#{isFeatured},#{featuredOrder},#{adminId},#{adminId})
+        INSERT INTO products(id,category_id,brand_id,gender,name,slug,short_description,description_json,status,is_featured,featured_order,created_by,updated_by)
+        VALUES(#{id},#{categoryId},#{brandId},#{gender},#{name},#{slug},#{shortDescription},CAST(#{descriptionJson} AS jsonb),#{status},#{isFeatured},#{featuredOrder},#{adminId},#{adminId})
     </insert>
     <update id="updateProduct">
-        UPDATE products SET category_id=#{categoryId}, name=#{name}, slug=#{slug}, short_description=#{shortDescription}, description_json=CAST(#{descriptionJson} AS jsonb), status=#{status}, is_featured=#{isFeatured}, featured_order=#{featuredOrder}, updated_by=#{adminId} WHERE id=#{id}
+        UPDATE products SET category_id=#{categoryId}, brand_id=#{brandId}, gender=#{gender}, name=#{name}, slug=#{slug}, short_description=#{shortDescription}, description_json=CAST(#{descriptionJson} AS jsonb), status=#{status}, is_featured=#{isFeatured}, featured_order=#{featuredOrder}, updated_by=#{adminId} WHERE id=#{id}
     </update>
     <update id="updateProductStatus">UPDATE products SET status=#{status}, updated_by=#{adminId} WHERE id=#{id}</update>
     <update id="softDeleteProduct">UPDATE products SET deleted_at=now(), updated_by=#{adminId} WHERE id=#{id}</update>

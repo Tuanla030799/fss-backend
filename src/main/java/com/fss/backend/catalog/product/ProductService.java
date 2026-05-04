@@ -1,6 +1,7 @@
 package com.fss.backend.catalog.product;
 
 import com.fss.backend.common.ApiException;
+import com.fss.backend.catalog.brand.BrandMapper;
 import com.fss.backend.catalog.category.CategoryMapper;
 import com.fss.backend.catalog.sku.Sku;
 import com.fss.backend.catalog.sku.SkuRequest;
@@ -20,30 +21,33 @@ import java.util.UUID;
 public class ProductService {
     private final ProductMapper mapper;
     private final CategoryMapper categoryMapper;
+    private final BrandMapper brandMapper;
     private final EcommerceSupport support;
 
-    public ProductService(ProductMapper mapper, CategoryMapper categoryMapper, EcommerceSupport support) {
+    public ProductService(ProductMapper mapper, CategoryMapper categoryMapper, BrandMapper brandMapper, EcommerceSupport support) {
         this.mapper = mapper;
         this.categoryMapper = categoryMapper;
+        this.brandMapper = brandMapper;
         this.support = support;
     }
 
-    public List<ProductSummary> listPublicProducts(UUID categoryId, String categorySlug, String keyword, String size,
+    public List<ProductSummary> listPublicProducts(UUID categoryId, String categorySlug, UUID brandId, String brandSlug, String gender, String keyword, String size,
                                                    String color, BigDecimal minPrice, BigDecimal maxPrice,
                                                    int page, int limit) {
-        return mapper.listProducts(true, null, categoryId, categorySlug, keyword, size, color, minPrice, maxPrice,
+        return mapper.listProducts(true, null, categoryId, categorySlug, brandId, brandSlug, support.normalizeProductGenderNullable(gender), keyword, size, color, minPrice, maxPrice,
                 false, support.safeLimit(limit), support.offset(page, limit)).stream().map(this::withProductUrl).toList();
     }
 
-    public List<ProductSummary> listAdminProducts(String status, UUID categoryId, String keyword, int page, int limit) {
-        return mapper.listProducts(false, support.normalizeProductStatusNullable(status), categoryId, null, keyword,
+    public List<ProductSummary> listAdminProducts(String status, UUID categoryId, UUID brandId, String gender, String keyword, int page, int limit) {
+        return mapper.listProducts(false, support.normalizeProductStatusNullable(status), categoryId, null, brandId, null,
+                support.normalizeProductGenderNullable(gender), keyword,
                 null, null, null, null, false, support.safeLimit(limit), support.offset(page, limit))
                 .stream().map(this::withProductUrl).toList();
     }
 
     @Cacheable(value = "featuredProducts", key = "#limit")
     public List<ProductSummary> featuredProducts(int limit) {
-        return mapper.listProducts(true, null, null, null, null, null, null, null, null, true,
+        return mapper.listProducts(true, null, null, null, null, null, null, null, null, null, null, null, true,
                 Math.min(Math.max(limit, 1), 30), 0).stream().map(this::withProductUrl).toList();
     }
 
@@ -59,8 +63,10 @@ public class ProductService {
     @CacheEvict(value = "featuredProducts", allEntries = true)
     public UUID createProduct(ProductRequest request) {
         support.require(categoryMapper.findCategoryById(request.categoryId()) != null, "Category not found");
+        requireBrandExists(request.brandId());
         UUID id = UUID.randomUUID();
-        mapper.insertProduct(id, request.categoryId(), request.name().trim(), uniqueSlug(request.slug(), request.name(), null),
+        mapper.insertProduct(id, request.categoryId(), request.brandId(), support.normalizeProductGenderDefault(request.gender()),
+                request.name().trim(), uniqueSlug(request.slug(), request.name(), null),
                 request.shortDescription(), support.json(request.descriptionJson()), support.normalizeProductStatusDefault(request.status()),
                 support.bool(request.isFeatured()), support.nz(request.featuredOrder()), support.adminId());
         replaceProductChildren(id, request.images(), request.variants(), request.skus());
@@ -72,7 +78,9 @@ public class ProductService {
     public void updateProduct(UUID id, ProductRequest request) {
         support.require(mapper.findProductSummaryById(id) != null, "Product not found");
         support.require(categoryMapper.findCategoryById(request.categoryId()) != null, "Category not found");
-        mapper.updateProduct(id, request.categoryId(), request.name().trim(), uniqueSlug(request.slug(), request.name(), id),
+        requireBrandExists(request.brandId());
+        mapper.updateProduct(id, request.categoryId(), request.brandId(), support.normalizeProductGenderDefault(request.gender()),
+                request.name().trim(), uniqueSlug(request.slug(), request.name(), id),
                 request.shortDescription(), support.json(request.descriptionJson()), support.normalizeProductStatusDefault(request.status()),
                 support.bool(request.isFeatured()), support.nz(request.featuredOrder()), support.adminId());
         replaceProductChildren(id, request.images(), request.variants(), request.skus());
@@ -97,7 +105,8 @@ public class ProductService {
         List<ProductImage> images = mapper.listImages(summary.id()).stream().map(this::withImageUrl).toList();
         List<ProductVariant> variants = mapper.listVariants(summary.id()).stream().map(this::withVariantUrl).toList();
         List<Sku> skus = mapper.listSkus(summary.id());
-        return new ProductDetail(summary.id(), summary.categoryId(), summary.categoryName(), summary.name(), summary.slug(),
+        return new ProductDetail(summary.id(), summary.categoryId(), summary.categoryName(), summary.brandId(), summary.brandName(),
+                summary.brandSlug(), summary.gender(), summary.name(), summary.slug(),
                 summary.shortDescription(), loadDescriptionJson(summary.id()), summary.status(), summary.isFeatured(),
                 summary.featuredOrder(), summary.createdAt(), images, variants, skus);
     }
@@ -193,9 +202,14 @@ public class ProductService {
         return normalized;
     }
 
+    private void requireBrandExists(UUID brandId) {
+        if (brandId == null) return;
+        support.require(brandMapper.findBrandById(brandId) != null, "Brand not found");
+    }
+
     private ProductSummary withProductUrl(ProductSummary product) {
         return product == null || product.primaryImageUrl() == null ? product : new ProductSummary(product.id(), product.categoryId(),
-                product.categoryName(), product.name(), product.slug(), product.shortDescription(), product.status(),
+                product.categoryName(), product.brandId(), product.brandName(), product.brandSlug(), product.gender(), product.name(), product.slug(), product.shortDescription(), product.status(),
                 product.isFeatured(), product.featuredOrder(), product.minPrice(), product.minSalePrice(), product.totalStock(),
                 product.primaryFileId(), support.publicUrl(product.primaryImageUrl()), product.createdAt());
     }

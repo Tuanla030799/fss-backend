@@ -25,6 +25,9 @@ public class ProductController {
     @GetMapping("/products")
     public ApiResponse<List<ProductSummary>> publicProducts(@RequestParam(required = false) UUID categoryId,
                                                             @RequestParam(required = false) String categorySlug,
+                                                            @RequestParam(required = false) UUID brandId,
+                                                            @RequestParam(required = false) String brandSlug,
+                                                            @RequestParam(required = false) String gender,
                                                             @RequestParam(required = false) String keyword,
                                                             @RequestParam(required = false) String size,
                                                             @RequestParam(required = false) String color,
@@ -32,7 +35,7 @@ public class ProductController {
                                                             @RequestParam(required = false) BigDecimal maxPrice,
                                                             @RequestParam(defaultValue = "1") @Min(1) int page,
                                                             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
-        return ApiResponse.ok("OK", service.listPublicProducts(categoryId, categorySlug, keyword, size, color, minPrice, maxPrice, page, limit));
+        return ApiResponse.ok("OK", service.listPublicProducts(categoryId, categorySlug, brandId, brandSlug, gender, keyword, size, color, minPrice, maxPrice, page, limit));
     }
 
     @GetMapping("/products/featured")
@@ -48,10 +51,12 @@ public class ProductController {
     @GetMapping("/admin/products")
     public ApiResponse<List<ProductSummary>> adminProducts(@RequestParam(required = false) String status,
                                                            @RequestParam(required = false) UUID categoryId,
+                                                           @RequestParam(required = false) UUID brandId,
+                                                           @RequestParam(required = false) String gender,
                                                            @RequestParam(required = false) String keyword,
                                                            @RequestParam(defaultValue = "1") @Min(1) int page,
                                                            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
-        return ApiResponse.ok("OK", service.listAdminProducts(status, categoryId, keyword, page, limit));
+        return ApiResponse.ok("OK", service.listAdminProducts(status, categoryId, brandId, gender, keyword, page, limit));
     }
 
     @GetMapping("/admin/products/{id}")

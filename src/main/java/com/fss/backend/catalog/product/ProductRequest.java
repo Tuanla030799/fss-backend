@@ -8,7 +8,7 @@ import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import java.util.UUID;
 
-public record ProductRequest(@NotNull UUID categoryId, @NotBlank String name, String slug, String shortDescription,
+public record ProductRequest(@NotNull UUID categoryId, UUID brandId, String gender, @NotBlank String name, String slug, String shortDescription,
                              String descriptionJson, String status, Boolean isFeatured, Integer featuredOrder,
                              List<@Valid ProductImageRequest> images,
                              List<@Valid VariantRequest> variants,

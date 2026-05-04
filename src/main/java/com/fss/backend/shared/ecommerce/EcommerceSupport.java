@@ -16,6 +16,7 @@ public class EcommerceSupport {
     public static final String INACTIVE = "INACTIVE";
     public static final String DRAFT = "DRAFT";
     public static final Set<String> PRODUCT_STATUSES = Set.of(ACTIVE, INACTIVE, DRAFT);
+    public static final Set<String> PRODUCT_GENDERS = Set.of("MALE", "FEMALE", "UNISEX");
     public static final Set<String> ORDER_STATUSES = Set.of("PENDING", "CONFIRMED", "SHIPPING", "COMPLETED", "CANCELLED");
 
     private final CurrentAdmin currentAdmin;
@@ -82,6 +83,18 @@ public class EcommerceSupport {
         String normalized = normalizeProductStatusNullable(status);
         require(normalized != null, "Status is required");
         return normalized;
+    }
+
+    public String normalizeProductGenderNullable(String gender) {
+        if (gender == null || gender.isBlank()) return null;
+        String normalized = gender.trim().toUpperCase();
+        require(PRODUCT_GENDERS.contains(normalized), "Product gender must be MALE, FEMALE or UNISEX");
+        return normalized;
+    }
+
+    public String normalizeProductGenderDefault(String gender) {
+        String normalized = normalizeProductGenderNullable(gender);
+        return normalized == null ? "UNISEX" : normalized;
     }
 
     public String normalizeOrderStatusNullable(String status) {

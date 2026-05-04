@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.fss.backend.content.collection.ProductCollectionMapper">
+    <sql id="collectionSelect">
+        c.id, c.name, c.slug, c.description, c.file_id, f.path AS image_url, c.status, c.sort_order,
+        COUNT(cp.product_id)::int AS product_count, c.created_at
+    </sql>
+
+    <sql id="productSummarySelect">
+        p.id, p.category_id, cat.name AS category_name, p.brand_id, b.name AS brand_name, b.slug AS brand_slug, p.gender,
+        p.name, p.slug, p.short_description, p.status, p.is_featured,
+        p.featured_order, MIN(s.price) AS min_price, MIN(COALESCE(s.sale_price, s.price)) AS min_sale_price,
+        COALESCE(SUM(s.stock), 0)::int AS total_stock,
+        (ARRAY_AGG(pi.file_id ORDER BY pi.is_primary DESC, pi.sort_order ASC) FILTER (WHERE pi.file_id IS NOT NULL))[1] AS primary_file_id,
+        (ARRAY_AGG(f.path ORDER BY pi.is_primary DESC, pi.sort_order ASC) FILTER (WHERE f.path IS NOT NULL))[1] AS primary_image_url,
+        p.created_at
+    </sql>
+
+    <select id="listCollections" resultType="com.fss.backend.content.collection.ProductCollection">
+        SELECT <include refid="collectionSelect" />
+        FROM collections c
+        LEFT JOIN files f ON f.id = c.file_id
+        LEFT JOIN collection_products cp ON cp.collection_id = c.id
+        <where>
+            c.deleted_at IS NULL
+            <if test="publicOnly">AND c.status = 'ACTIVE'</if>
+            <if test="status != null and status != ''">AND c.status = #{status}</if>
+            <if test="keyword != null and keyword != ''">AND (c.name ILIKE CONCAT('%', #{keyword}, '%') OR c.description ILIKE CONCAT('%', #{keyword}, '%'))</if>
+        </where>
+        GROUP BY c.id, f.path
+        ORDER BY c.sort_order ASC, c.created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="findCollectionById" resultType="com.fss.backend.content.collection.ProductCollection">
+        SELECT <include refid="collectionSelect" />
+        FROM collections c
+        LEFT JOIN files f ON f.id = c.file_id
+        LEFT JOIN collection_products cp ON cp.collection_id = c.id
+        WHERE c.id = #{id} AND c.deleted_at IS NULL
+        GROUP BY c.id, f.path
+    </select>
+
+    <select id="findCollectionBySlug" resultType="com.fss.backend.content.collection.ProductCollection">
+        SELECT <include refid="collectionSelect" />
+        FROM collections c
+        LEFT JOIN files f ON f.id = c.file_id
+        LEFT JOIN collection_products cp ON cp.collection_id = c.id
+        WHERE c.slug = #{slug} AND c.deleted_at IS NULL <if test="publicOnly">AND c.status = 'ACTIVE'</if>
+        GROUP BY c.id, f.path
+    </select>
+
+    <select id="countCollectionSlug" resultType="int">
+        SELECT COUNT(*) FROM collections WHERE slug = #{slug} AND deleted_at IS NULL <if test="excludeId != null">AND id != #{excludeId}</if>
+    </select>
+
+    <insert id="insertCollection">
+        INSERT INTO collections(id,name,slug,description,file_id,status,sort_order,created_by,updated_by)
+        VALUES(#{id},#{name},#{slug},#{description},#{fileId},#{status},#{sortOrder},#{adminId},#{adminId})
+    </insert>
+
+    <update id="updateCollection">
+        UPDATE collections
+        SET name=#{name}, slug=#{slug}, description=#{description}, file_id=#{fileId},
+            status=#{status}, sort_order=#{sortOrder}, updated_by=#{adminId}
+        WHERE id=#{id} AND deleted_at IS NULL
+    </update>
+
+    <update id="softDeleteCollection">
+        UPDATE collections SET deleted_at=now(), updated_by=#{adminId} WHERE id=#{id} AND deleted_at IS NULL
+    </update>
+
+    <delete id="deleteCollectionProducts">
+        DELETE FROM collection_products WHERE collection_id=#{collectionId}
+    </delete>
+
+    <insert id="insertCollectionProduct">
+        INSERT INTO collection_products(collection_id, product_id, sort_order)
+        VALUES(#{collectionId}, #{productId}, #{sortOrder})
+        ON CONFLICT (collection_id, product_id) DO UPDATE SET sort_order = EXCLUDED.sort_order
+    </insert>
+
+    <select id="listCollectionProducts" resultType="com.fss.backend.catalog.product.ProductSummary">
+        SELECT <include refid="productSummarySelect" />
+        FROM collection_products cp
+        JOIN products p ON p.id = cp.product_id
+        JOIN categories cat ON cat.id = p.category_id
+        LEFT JOIN brands b ON b.id = p.brand_id
+        LEFT JOIN skus s ON s.product_id = p.id AND s.deleted_at IS NULL
+        LEFT JOIN product_images pi ON pi.product_id = p.id
+        LEFT JOIN files f ON f.id = pi.file_id
+        WHERE cp.collection_id = #{collectionId}
+          AND p.deleted_at IS NULL
+          <if test="publicOnly">AND p.status = 'ACTIVE' AND cat.status = 'ACTIVE' AND cat.deleted_at IS NULL AND (b.id IS NULL OR (b.status = 'ACTIVE' AND b.deleted_at IS NULL))</if>
+        GROUP BY p.id, cat.name, b.name, b.slug, cp.sort_order
+        ORDER BY cp.sort_order ASC, p.created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+</mapper>

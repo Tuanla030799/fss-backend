@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.fss.backend.content.blog.BlogPostMapper">
+    <sql id="postSelect">
+        p.id, p.title, p.slug, p.excerpt, p.content_json::text AS content_json, p.cover_file_id,
+        f.path AS cover_image_url, p.status, p.published_at, p.created_at
+    </sql>
+
+    <select id="listPosts" resultType="com.fss.backend.content.blog.BlogPost">
+        SELECT <include refid="postSelect" />
+        FROM blog_posts p
+        LEFT JOIN files f ON f.id = p.cover_file_id
+        <where>
+            p.deleted_at IS NULL
+            <if test="publicOnly">AND p.status = 'ACTIVE' AND (p.published_at IS NULL OR p.published_at &lt;= now())</if>
+            <if test="status != null and status != ''">AND p.status = #{status}</if>
+            <if test="keyword != null and keyword != ''">AND (p.title ILIKE CONCAT('%', #{keyword}, '%') OR p.excerpt ILIKE CONCAT('%', #{keyword}, '%'))</if>
+        </where>
+        ORDER BY p.published_at DESC NULLS LAST, p.created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="findPostById" resultType="com.fss.backend.content.blog.BlogPost">
+        SELECT <include refid="postSelect" />
+        FROM blog_posts p
+        LEFT JOIN files f ON f.id = p.cover_file_id
+        WHERE p.id=#{id} AND p.deleted_at IS NULL
+    </select>
+
+    <select id="findPostBySlug" resultType="com.fss.backend.content.blog.BlogPost">
+        SELECT <include refid="postSelect" />
+        FROM blog_posts p
+        LEFT JOIN files f ON f.id = p.cover_file_id
+        WHERE p.slug=#{slug} AND p.deleted_at IS NULL
+        <if test="publicOnly">AND p.status = 'ACTIVE' AND (p.published_at IS NULL OR p.published_at &lt;= now())</if>
+    </select>
+
+    <select id="countPostSlug" resultType="int">
+        SELECT COUNT(*) FROM blog_posts WHERE slug=#{slug} AND deleted_at IS NULL <if test="excludeId != null">AND id != #{excludeId}</if>
+    </select>
+
+    <insert id="insertPost">
+        INSERT INTO blog_posts(id,title,slug,excerpt,content_json,cover_file_id,status,published_at,created_by,updated_by)
+        VALUES(#{id},#{title},#{slug},#{excerpt},CAST(#{contentJson} AS jsonb),#{coverFileId},#{status},#{publishedAt},#{adminId},#{adminId})
+    </insert>
+
+    <update id="updatePost">
+        UPDATE blog_posts
+        SET title=#{title}, slug=#{slug}, excerpt=#{excerpt}, content_json=CAST(#{contentJson} AS jsonb),
+            cover_file_id=#{coverFileId}, status=#{status}, published_at=#{publishedAt}, updated_by=#{adminId}
+        WHERE id=#{id} AND deleted_at IS NULL
+    </update>
+
+    <update id="softDeletePost">
+        UPDATE blog_posts SET deleted_at=now(), updated_by=#{adminId} WHERE id=#{id} AND deleted_at IS NULL
+    </update>
+</mapper>
