@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.fss.backend.masterdata.SizeColorMapper">
+    <select id="listSizes" resultType="com.fss.backend.masterdata.SizeOption">
+        SELECT id, value, label, status, sort_order, created_at
+        FROM sizes
+        <where>
+            deleted_at IS NULL
+            <if test="status != null and status != ''">AND status = #{status}</if>
+            <if test="keyword != null and keyword != ''">AND (value ILIKE CONCAT('%', #{keyword}, '%') OR label ILIKE CONCAT('%', #{keyword}, '%'))</if>
+        </where>
+        ORDER BY sort_order ASC, value ASC
+    </select>
+    <select id="findSizeById" resultType="com.fss.backend.masterdata.SizeOption">
+        SELECT id, value, label, status, sort_order, created_at FROM sizes WHERE id=#{id} AND deleted_at IS NULL
+    </select>
+    <select id="findSizeByValue" resultType="com.fss.backend.masterdata.SizeOption">
+        SELECT id, value, label, status, sort_order, created_at FROM sizes WHERE LOWER(value)=LOWER(#{value}) AND deleted_at IS NULL
+    </select>
+    <select id="countSizeValue" resultType="int">
+        SELECT COUNT(*) FROM sizes WHERE LOWER(value)=LOWER(#{value}) AND deleted_at IS NULL <if test="excludeId != null">AND id != #{excludeId}</if>
+    </select>
+    <insert id="insertSize">
+        INSERT INTO sizes(id,value,label,status,sort_order,created_by,updated_by)
+        VALUES(#{id},#{value},#{label},#{status},#{sortOrder},#{adminId},#{adminId})
+    </insert>
+    <update id="updateSize">
+        UPDATE sizes SET value=#{value}, label=#{label}, status=#{status}, sort_order=#{sortOrder}, updated_by=#{adminId}
+        WHERE id=#{id} AND deleted_at IS NULL
+    </update>
+    <update id="softDeleteSize">
+        UPDATE sizes SET deleted_at=now(), updated_by=#{adminId} WHERE id=#{id} AND deleted_at IS NULL
+    </update>
+
+    <select id="listColors" resultType="com.fss.backend.masterdata.ColorOption">
+        SELECT id, name AS value, name AS label, color_code, status, sort_order, created_at
+        FROM colors
+        <where>
+            deleted_at IS NULL
+            <if test="status != null and status != ''">AND status = #{status}</if>
+            <if test="keyword != null and keyword != ''">AND (name ILIKE CONCAT('%', #{keyword}, '%') OR color_code ILIKE CONCAT('%', #{keyword}, '%'))</if>
+        </where>
+        ORDER BY sort_order ASC, name ASC
+    </select>
+    <select id="findColorById" resultType="com.fss.backend.masterdata.ColorOption">
+        SELECT id, name AS value, name AS label, color_code, status, sort_order, created_at FROM colors WHERE id=#{id} AND deleted_at IS NULL
+    </select>
+    <select id="findColorByName" resultType="com.fss.backend.masterdata.ColorOption">
+        SELECT id, name AS value, name AS label, color_code, status, sort_order, created_at FROM colors WHERE LOWER(name)=LOWER(#{name}) AND deleted_at IS NULL
+    </select>
+    <select id="countColorName" resultType="int">
+        SELECT COUNT(*) FROM colors WHERE LOWER(name)=LOWER(#{name}) AND deleted_at IS NULL <if test="excludeId != null">AND id != #{excludeId}</if>
+    </select>
+    <insert id="insertColor">
+        INSERT INTO colors(id,name,color_code,status,sort_order,created_by,updated_by)
+        VALUES(#{id},#{name},#{colorCode},#{status},#{sortOrder},#{adminId},#{adminId})
+    </insert>
+    <update id="updateColor">
+        UPDATE colors SET name=#{name}, color_code=#{colorCode}, status=#{status}, sort_order=#{sortOrder}, updated_by=#{adminId}
+        WHERE id=#{id} AND deleted_at IS NULL
+    </update>
+    <update id="softDeleteColor">
+        UPDATE colors SET deleted_at=now(), updated_by=#{adminId} WHERE id=#{id} AND deleted_at IS NULL
+    </update>
+</mapper>
