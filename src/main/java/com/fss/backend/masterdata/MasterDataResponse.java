@@ -7,4 +7,6 @@ public record MasterDataResponse(List<MasterDataOption> categories,
                                  List<MasterDataOption> collections,
                                  List<StaticOption> productGenders,
                                  List<StaticOption> productStatuses,
-                                 List<StaticOption> commonStatuses) {}
+                                 List<StaticOption> commonStatuses,
+                                 List<SizeOption> sizes,
+                                 List<ColorOption> colors) {}

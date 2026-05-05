@@ -137,6 +137,21 @@ public class EcommerceSupport {
         return value == null || value.isBlank() ? fallback : value;
     }
 
+    public String trim(String value) {
+        return value == null ? null : value.trim();
+    }
+
+    public String trimToNull(String value) {
+        String trimmed = trim(value);
+        return trimmed == null || trimmed.isBlank() ? null : trimmed;
+    }
+
+    public String trimRequired(String value, String field) {
+        String trimmed = trimToNull(value);
+        require(trimmed != null, field + " is required");
+        return trimmed;
+    }
+
     public String json(String value) {
         return value == null || value.isBlank() ? "{}" : value;
     }

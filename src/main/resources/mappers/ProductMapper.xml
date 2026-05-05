@@ -30,8 +30,8 @@
             <if test="gender != null and gender != ''">AND p.gender = #{gender}</if>
             <if test="keyword != null and keyword != ''">AND (p.name ILIKE CONCAT('%', #{keyword}, '%') OR p.short_description ILIKE CONCAT('%', #{keyword}, '%'))</if>
             <if test="featuredOnly">AND p.is_featured = true</if>
-            <if test="size != null and size != ''">AND EXISTS (SELECT 1 FROM skus sx WHERE sx.product_id=p.id AND sx.deleted_at IS NULL AND sx.size=#{size})</if>
-            <if test="color != null and color != ''">AND EXISTS (SELECT 1 FROM product_variants vx WHERE vx.product_id=p.id AND vx.deleted_at IS NULL AND (vx.color_name ILIKE CONCAT('%', #{color}, '%') OR vx.name ILIKE CONCAT('%', #{color}, '%')))</if>
+            <if test="size != null and size != ''">AND EXISTS (SELECT 1 FROM skus sx JOIN sizes sz ON sz.id = sx.size_id WHERE sx.product_id=p.id AND sx.deleted_at IS NULL AND sz.value=#{size})</if>
+            <if test="color != null and color != ''">AND EXISTS (SELECT 1 FROM product_variants vx JOIN colors cx ON cx.id = vx.color_id WHERE vx.product_id=p.id AND vx.deleted_at IS NULL AND (cx.name ILIKE CONCAT('%', #{color}, '%') OR cx.color_code ILIKE CONCAT('%', #{color}, '%') OR vx.name ILIKE CONCAT('%', #{color}, '%')))</if>
             <if test="minPrice != null">AND EXISTS (SELECT 1 FROM skus sp WHERE sp.product_id=p.id AND sp.deleted_at IS NULL AND COALESCE(sp.sale_price, sp.price) &gt;= #{minPrice})</if>
             <if test="maxPrice != null">AND EXISTS (SELECT 1 FROM skus sp WHERE sp.product_id=p.id AND sp.deleted_at IS NULL AND COALESCE(sp.sale_price, sp.price) &lt;= #{maxPrice})</if>
         </where>
@@ -85,8 +85,12 @@
     </insert>
 
     <select id="listVariants" resultType="com.fss.backend.catalog.product.ProductVariant">
-        SELECT v.id, v.product_id, v.name, v.color_name, v.color_code, v.image_file_id, f.path AS image_url, v.status, v.sort_order
-        FROM product_variants v LEFT JOIN files f ON f.id=v.image_file_id WHERE v.product_id=#{productId} AND v.deleted_at IS NULL ORDER BY v.sort_order ASC, v.created_at ASC
+        SELECT v.id, v.product_id, v.name, v.color_id, c.name AS color_name,
+               c.color_code, v.image_file_id, f.path AS image_url, v.status, v.sort_order
+        FROM product_variants v
+        JOIN colors c ON c.id=v.color_id
+        LEFT JOIN files f ON f.id=v.image_file_id
+        WHERE v.product_id=#{productId} AND v.deleted_at IS NULL ORDER BY v.sort_order ASC, v.created_at ASC
     </select>
     <update id="deleteVariants">UPDATE product_variants SET deleted_at=now() WHERE product_id=#{productId}</update>
     <update id="softDeleteMissingVariants">
@@ -97,22 +101,27 @@
         </if>
     </update>
     <select id="findVariantById" resultType="com.fss.backend.catalog.product.ProductVariant">
-        SELECT v.id, v.product_id, v.name, v.color_name, v.color_code, v.image_file_id, f.path AS image_url, v.status, v.sort_order
-        FROM product_variants v LEFT JOIN files f ON f.id=v.image_file_id
+        SELECT v.id, v.product_id, v.name, v.color_id, c.name AS color_name,
+               c.color_code, v.image_file_id, f.path AS image_url, v.status, v.sort_order
+        FROM product_variants v
+        JOIN colors c ON c.id=v.color_id
+        LEFT JOIN files f ON f.id=v.image_file_id
         WHERE v.id=#{id} AND v.product_id=#{productId} AND v.deleted_at IS NULL
     </select>
     <insert id="insertVariant">
-        INSERT INTO product_variants(id,product_id,name,color_name,color_code,image_file_id,status,sort_order) VALUES(#{id},#{productId},#{name},#{colorName},#{colorCode},#{imageFileId},#{status},#{sortOrder})
+        INSERT INTO product_variants(id,product_id,name,color_id,image_file_id,status,sort_order) VALUES(#{id},#{productId},#{name},#{colorId},#{imageFileId},#{status},#{sortOrder})
     </insert>
     <update id="updateVariant">
         UPDATE product_variants
-        SET name=#{name}, color_name=#{colorName}, color_code=#{colorCode}, image_file_id=#{imageFileId}, status=#{status}, sort_order=#{sortOrder}
+        SET name=#{name}, color_id=#{colorId}, image_file_id=#{imageFileId}, status=#{status}, sort_order=#{sortOrder}
         WHERE id=#{id} AND product_id=#{productId} AND deleted_at IS NULL
     </update>
     <update id="softDeleteVariant">UPDATE product_variants SET deleted_at=now() WHERE id=#{id} AND product_id=#{productId}</update>
 
     <select id="listSkus" resultType="com.fss.backend.catalog.sku.Sku">
-        SELECT id, product_id, variant_id, sku_code, size, price, sale_price, stock, status, created_at FROM skus WHERE product_id=#{productId} AND deleted_at IS NULL ORDER BY size ASC, created_at ASC
+        SELECT s.id, s.product_id, s.variant_id, s.sku_code, s.size_id, sz.value AS size, s.price, s.sale_price, s.stock, s.status, s.created_at
+        FROM skus s JOIN sizes sz ON sz.id=s.size_id
+        WHERE s.product_id=#{productId} AND s.deleted_at IS NULL ORDER BY sz.value ASC, s.created_at ASC
     </select>
     <update id="deleteSkus">UPDATE skus SET deleted_at=now() WHERE product_id=#{productId}</update>
     <update id="softDeleteMissingSkus">
@@ -123,18 +132,19 @@
         </if>
     </update>
     <select id="findSkuById" resultType="com.fss.backend.catalog.sku.Sku">
-        SELECT id, product_id, variant_id, sku_code, size, price, sale_price, stock, status, created_at
-        FROM skus WHERE id=#{id} AND product_id=#{productId} AND deleted_at IS NULL
+        SELECT s.id, s.product_id, s.variant_id, s.sku_code, s.size_id, sz.value AS size, s.price, s.sale_price, s.stock, s.status, s.created_at
+        FROM skus s JOIN sizes sz ON sz.id=s.size_id
+        WHERE s.id=#{id} AND s.product_id=#{productId} AND s.deleted_at IS NULL
     </select>
     <select id="countSkuCode" resultType="int">
         SELECT COUNT(*) FROM skus WHERE sku_code=#{skuCode} AND deleted_at IS NULL <if test="excludeId != null">AND id != #{excludeId}</if>
     </select>
     <insert id="insertSku">
-        INSERT INTO skus(id,product_id,variant_id,sku_code,size,price,sale_price,stock,status) VALUES(#{id},#{productId},#{variantId},#{skuCode},#{size},#{price},#{salePrice},#{stock},#{status})
+        INSERT INTO skus(id,product_id,variant_id,sku_code,size_id,price,sale_price,stock,status) VALUES(#{id},#{productId},#{variantId},#{skuCode},#{sizeId},#{price},#{salePrice},#{stock},#{status})
     </insert>
     <update id="updateSku">
         UPDATE skus
-        SET variant_id=#{variantId}, sku_code=#{skuCode}, size=#{size}, price=#{price}, sale_price=#{salePrice}, stock=#{stock}, status=#{status}
+        SET variant_id=#{variantId}, sku_code=#{skuCode}, size_id=#{sizeId}, price=#{price}, sale_price=#{salePrice}, stock=#{stock}, status=#{status}
         WHERE id=#{id} AND product_id=#{productId} AND deleted_at IS NULL
     </update>
     <update id="softDeleteSku">UPDATE skus SET deleted_at=now() WHERE id=#{id} AND product_id=#{productId}</update>

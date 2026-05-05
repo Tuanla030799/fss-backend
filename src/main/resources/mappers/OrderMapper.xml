@@ -2,8 +2,12 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.fss.backend.sales.order.OrderMapper">
     <select id="findSkuForOrder" resultType="com.fss.backend.catalog.sku.SkuForOrder">
-        SELECT s.id, s.product_id, s.variant_id, s.sku_code, s.size, s.price, s.sale_price, s.stock, s.status, p.name AS product_name, v.name AS variant_name
-        FROM skus s JOIN products p ON p.id=s.product_id LEFT JOIN product_variants v ON v.id=s.variant_id
+        SELECT s.id, s.product_id, s.variant_id, s.sku_code, s.size_id, sz.value AS size,
+               s.price, s.sale_price, s.stock, s.status, p.name AS product_name, v.name AS variant_name
+        FROM skus s
+        JOIN products p ON p.id=s.product_id
+        LEFT JOIN product_variants v ON v.id=s.variant_id
+        JOIN sizes sz ON sz.id=s.size_id
         WHERE s.id=#{id} AND s.deleted_at IS NULL AND p.deleted_at IS NULL AND p.status='ACTIVE' AND s.status='ACTIVE'
     </select>
     <update id="decrementStock">UPDATE skus SET stock=stock-#{quantity} WHERE id=#{skuId} AND stock &gt;= #{quantity} AND deleted_at IS NULL</update>

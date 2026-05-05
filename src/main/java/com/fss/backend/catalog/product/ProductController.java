@@ -53,10 +53,12 @@ public class ProductController {
                                                            @RequestParam(required = false) UUID categoryId,
                                                            @RequestParam(required = false) UUID brandId,
                                                            @RequestParam(required = false) String gender,
+                                                           @RequestParam(required = false) String size,
+                                                           @RequestParam(required = false) String color,
                                                            @RequestParam(required = false) String keyword,
                                                            @RequestParam(defaultValue = "1") @Min(1) int page,
                                                            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
-        return ApiResponse.ok("OK", service.listAdminProducts(status, categoryId, brandId, gender, keyword, page, limit));
+        return ApiResponse.ok("OK", service.listAdminProducts(status, categoryId, brandId, gender, size, color, keyword, page, limit));
     }
 
     @GetMapping("/admin/products/{id}")
@@ -90,8 +92,8 @@ public class ProductController {
     public ApiResponse<Map<String, UUID>> upsertVariant(@PathVariable UUID productId,
                                                         @PathVariable UUID variantId,
                                                         @Valid @RequestBody VariantRequest body) {
-        UUID id = service.upsertVariant(productId, new VariantRequest(variantId, body.clientId(), body.name(), body.colorName(),
-                body.colorCode(), body.imageFileId(), body.status(), body.sortOrder()));
+        UUID id = service.upsertVariant(productId, new VariantRequest(variantId, body.clientId(), body.name(), body.colorId(),
+                body.colorName(), body.colorCode(), body.imageFileId(), body.status(), body.sortOrder()));
         return ApiResponse.ok("Updated", Map.of("id", id));
     }
 
@@ -117,7 +119,7 @@ public class ProductController {
                                                     @PathVariable UUID skuId,
                                                     @Valid @RequestBody SkuRequest body) {
         UUID id = service.upsertSku(productId, new SkuRequest(skuId, body.variantClientId(), body.variantId(), body.skuCode(),
-                body.size(), body.price(), body.salePrice(), body.stock(), body.status()));
+                body.sizeId(), body.size(), body.price(), body.salePrice(), body.stock(), body.status()));
         return ApiResponse.ok("Updated", Map.of("id", id));
     }
 

@@ -5,6 +5,9 @@ import com.fss.backend.catalog.brand.BrandMapper;
 import com.fss.backend.catalog.category.CategoryMapper;
 import com.fss.backend.catalog.sku.Sku;
 import com.fss.backend.catalog.sku.SkuRequest;
+import com.fss.backend.masterdata.ColorOption;
+import com.fss.backend.masterdata.SizeColorMapper;
+import com.fss.backend.masterdata.SizeOption;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -22,26 +25,30 @@ public class ProductService {
     private final ProductMapper mapper;
     private final CategoryMapper categoryMapper;
     private final BrandMapper brandMapper;
+    private final SizeColorMapper sizeColorMapper;
     private final EcommerceSupport support;
 
-    public ProductService(ProductMapper mapper, CategoryMapper categoryMapper, BrandMapper brandMapper, EcommerceSupport support) {
+    public ProductService(ProductMapper mapper, CategoryMapper categoryMapper, BrandMapper brandMapper,
+                          SizeColorMapper sizeColorMapper, EcommerceSupport support) {
         this.mapper = mapper;
         this.categoryMapper = categoryMapper;
         this.brandMapper = brandMapper;
+        this.sizeColorMapper = sizeColorMapper;
         this.support = support;
     }
 
     public List<ProductSummary> listPublicProducts(UUID categoryId, String categorySlug, UUID brandId, String brandSlug, String gender, String keyword, String size,
                                                    String color, BigDecimal minPrice, BigDecimal maxPrice,
                                                    int page, int limit) {
-        return mapper.listProducts(true, null, categoryId, categorySlug, brandId, brandSlug, support.normalizeProductGenderNullable(gender), keyword, size, color, minPrice, maxPrice,
+        return mapper.listProducts(true, null, categoryId, categorySlug, brandId, brandSlug, support.normalizeProductGenderNullable(gender),
+                support.trimToNull(keyword), support.trimToNull(size), support.trimToNull(color), minPrice, maxPrice,
                 false, support.safeLimit(limit), support.offset(page, limit)).stream().map(this::withProductUrl).toList();
     }
 
-    public List<ProductSummary> listAdminProducts(String status, UUID categoryId, UUID brandId, String gender, String keyword, int page, int limit) {
+    public List<ProductSummary> listAdminProducts(String status, UUID categoryId, UUID brandId, String gender, String size, String color, String keyword, int page, int limit) {
         return mapper.listProducts(false, support.normalizeProductStatusNullable(status), categoryId, null, brandId, null,
-                support.normalizeProductGenderNullable(gender), keyword,
-                null, null, null, null, false, support.safeLimit(limit), support.offset(page, limit))
+                support.normalizeProductGenderNullable(gender), support.trimToNull(keyword),
+                support.trimToNull(size), support.trimToNull(color), null, null, false, support.safeLimit(limit), support.offset(page, limit))
                 .stream().map(this::withProductUrl).toList();
     }
 
@@ -66,8 +73,8 @@ public class ProductService {
         requireBrandExists(request.brandId());
         UUID id = UUID.randomUUID();
         mapper.insertProduct(id, request.categoryId(), request.brandId(), support.normalizeProductGenderDefault(request.gender()),
-                request.name().trim(), uniqueSlug(request.slug(), request.name(), null),
-                request.shortDescription(), support.json(request.descriptionJson()), support.normalizeProductStatusDefault(request.status()),
+                support.trimRequired(request.name(), "Product name"), uniqueSlug(request.slug(), request.name(), null),
+                support.trimToNull(request.shortDescription()), support.json(request.descriptionJson()), support.normalizeProductStatusDefault(request.status()),
                 support.bool(request.isFeatured()), support.nz(request.featuredOrder()), support.adminId());
         replaceProductChildren(id, request.images(), request.variants(), request.skus());
         return id;
@@ -80,8 +87,8 @@ public class ProductService {
         support.require(categoryMapper.findCategoryById(request.categoryId()) != null, "Category not found");
         requireBrandExists(request.brandId());
         mapper.updateProduct(id, request.categoryId(), request.brandId(), support.normalizeProductGenderDefault(request.gender()),
-                request.name().trim(), uniqueSlug(request.slug(), request.name(), id),
-                request.shortDescription(), support.json(request.descriptionJson()), support.normalizeProductStatusDefault(request.status()),
+                support.trimRequired(request.name(), "Product name"), uniqueSlug(request.slug(), request.name(), id),
+                support.trimToNull(request.shortDescription()), support.json(request.descriptionJson()), support.normalizeProductStatusDefault(request.status()),
                 support.bool(request.isFeatured()), support.nz(request.featuredOrder()), support.adminId());
         replaceProductChildren(id, request.images(), request.variants(), request.skus());
     }
@@ -152,11 +159,14 @@ public class ProductService {
         support.activateFile(variant.imageFileId());
         UUID id = variant.id() == null ? UUID.randomUUID() : variant.id();
         String status = support.normalizeStatusDefault(variant.status(), EcommerceSupport.ACTIVE);
+        ColorValue color = resolveColor(variant);
         if (variant.id() == null) {
-            mapper.insertVariant(id, productId, variant.name(), variant.colorName(), variant.colorCode(), variant.imageFileId(), status, support.nz(variant.sortOrder()));
+            mapper.insertVariant(id, productId, support.trimRequired(variant.name(), "Variant name"),
+                    color.id(), variant.imageFileId(), status, support.nz(variant.sortOrder()));
         } else {
             support.require(mapper.findVariantById(id, productId) != null, "Variant not found");
-            mapper.updateVariant(id, productId, variant.name(), variant.colorName(), variant.colorCode(), variant.imageFileId(), status, support.nz(variant.sortOrder()));
+            mapper.updateVariant(id, productId, support.trimRequired(variant.name(), "Variant name"),
+                    color.id(), variant.imageFileId(), status, support.nz(variant.sortOrder()));
         }
         return id;
     }
@@ -176,13 +186,15 @@ public class ProductService {
             throw new ApiException("salePrice must be <= price");
         }
         UUID id = sku.id() == null ? UUID.randomUUID() : sku.id();
-        support.require(mapper.countSkuCode(sku.skuCode(), sku.id()) == 0, "SKU code already exists");
+        String skuCode = support.trimRequired(sku.skuCode(), "SKU code");
+        SizeValue size = resolveSize(sku);
+        support.require(mapper.countSkuCode(skuCode, sku.id()) == 0, "SKU code already exists");
         String status = support.normalizeStatusDefault(sku.status(), EcommerceSupport.ACTIVE);
         if (sku.id() == null) {
-            mapper.insertSku(id, productId, variantId, sku.skuCode(), sku.size(), sku.price(), sku.salePrice(), sku.stock(), status);
+            mapper.insertSku(id, productId, variantId, skuCode, size.id(), sku.price(), sku.salePrice(), sku.stock(), status);
         } else {
             support.require(mapper.findSkuById(id, productId) != null, "SKU not found");
-            mapper.updateSku(id, productId, variantId, sku.skuCode(), sku.size(), sku.price(), sku.salePrice(), sku.stock(), status);
+            mapper.updateSku(id, productId, variantId, skuCode, size.id(), sku.price(), sku.salePrice(), sku.stock(), status);
         }
         return id;
     }
@@ -207,6 +219,22 @@ public class ProductService {
         support.require(brandMapper.findBrandById(brandId) != null, "Brand not found");
     }
 
+    private SizeValue resolveSize(SkuRequest sku) {
+        support.require(sku.sizeId() != null, "Size is required");
+        SizeOption size = sizeColorMapper.findSizeById(sku.sizeId());
+        support.require(size != null, "Size not found");
+        support.require(EcommerceSupport.ACTIVE.equals(size.status()), "Size is inactive");
+        return new SizeValue(size.id(), size.value());
+    }
+
+    private ColorValue resolveColor(VariantRequest variant) {
+        support.require(variant.colorId() != null, "Color is required");
+        ColorOption color = sizeColorMapper.findColorById(variant.colorId());
+        support.require(color != null, "Color not found");
+        support.require(EcommerceSupport.ACTIVE.equals(color.status()), "Color is inactive");
+        return new ColorValue(color.id(), color.value(), color.colorCode());
+    }
+
     private ProductSummary withProductUrl(ProductSummary product) {
         return product == null || product.primaryImageUrl() == null ? product : new ProductSummary(product.id(), product.categoryId(),
                 product.categoryName(), product.brandId(), product.brandName(), product.brandSlug(), product.gender(), product.name(), product.slug(), product.shortDescription(), product.status(),
@@ -221,7 +249,10 @@ public class ProductService {
 
     private ProductVariant withVariantUrl(ProductVariant variant) {
         return variant == null || variant.imageUrl() == null ? variant : new ProductVariant(variant.id(), variant.productId(),
-                variant.name(), variant.colorName(), variant.colorCode(), variant.imageFileId(), support.publicUrl(variant.imageUrl()),
+                variant.name(), variant.colorId(), variant.colorName(), variant.colorCode(), variant.imageFileId(), support.publicUrl(variant.imageUrl()),
                 variant.status(), variant.sortOrder());
     }
+
+    private record SizeValue(UUID id, String value) {}
+    private record ColorValue(UUID id, String name, String colorCode) {}
 }

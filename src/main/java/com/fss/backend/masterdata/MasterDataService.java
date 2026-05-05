@@ -16,11 +16,14 @@ public class MasterDataService {
     private final CategoryMapper categoryMapper;
     private final BrandMapper brandMapper;
     private final ProductCollectionMapper collectionMapper;
+    private final SizeColorMapper sizeColorMapper;
 
-    public MasterDataService(CategoryMapper categoryMapper, BrandMapper brandMapper, ProductCollectionMapper collectionMapper) {
+    public MasterDataService(CategoryMapper categoryMapper, BrandMapper brandMapper, ProductCollectionMapper collectionMapper,
+                             SizeColorMapper sizeColorMapper) {
         this.categoryMapper = categoryMapper;
         this.brandMapper = brandMapper;
         this.collectionMapper = collectionMapper;
+        this.sizeColorMapper = sizeColorMapper;
     }
 
     public MasterDataResponse publicMasterData() {
@@ -39,7 +42,9 @@ public class MasterDataService {
                 collectionMapper.listCollections(publicOnly, status, null, 1000, 0).stream().map(this::collectionOption).toList(),
                 List.of(new StaticOption("MALE", "Nam"), new StaticOption("FEMALE", "Nữ"), new StaticOption("UNISEX", "Unisex")),
                 List.of(new StaticOption("DRAFT", "Nháp"), new StaticOption("ACTIVE", "Hoạt động"), new StaticOption("INACTIVE", "Ẩn")),
-                List.of(new StaticOption("ACTIVE", "Hoạt động"), new StaticOption("INACTIVE", "Ẩn"))
+                List.of(new StaticOption("ACTIVE", "Hoạt động"), new StaticOption("INACTIVE", "Ẩn")),
+                sizeColorMapper.listSizes(status, null),
+                sizeColorMapper.listColors(status, null)
         );
     }
 

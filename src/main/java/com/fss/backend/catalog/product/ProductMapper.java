@@ -47,11 +47,11 @@ public interface ProductMapper {
     void softDeleteMissingVariants(@Param("productId") UUID productId, @Param("keepIds") Set<String> keepIds);
     ProductVariant findVariantById(@Param("id") UUID id, @Param("productId") UUID productId);
     void insertVariant(@Param("id") UUID id, @Param("productId") UUID productId, @Param("name") String name,
-                       @Param("colorName") String colorName, @Param("colorCode") String colorCode,
+                       @Param("colorId") UUID colorId,
                        @Param("imageFileId") UUID imageFileId, @Param("status") String status,
                        @Param("sortOrder") Integer sortOrder);
     void updateVariant(@Param("id") UUID id, @Param("productId") UUID productId, @Param("name") String name,
-                       @Param("colorName") String colorName, @Param("colorCode") String colorCode,
+                       @Param("colorId") UUID colorId,
                        @Param("imageFileId") UUID imageFileId, @Param("status") String status,
                        @Param("sortOrder") Integer sortOrder);
     void softDeleteVariant(@Param("id") UUID id, @Param("productId") UUID productId);
@@ -61,10 +61,10 @@ public interface ProductMapper {
     Sku findSkuById(@Param("id") UUID id, @Param("productId") UUID productId);
     int countSkuCode(@Param("skuCode") String skuCode, @Param("excludeId") UUID excludeId);
     void insertSku(@Param("id") UUID id, @Param("productId") UUID productId, @Param("variantId") UUID variantId,
-                   @Param("skuCode") String skuCode, @Param("size") String size, @Param("price") BigDecimal price,
+                   @Param("skuCode") String skuCode, @Param("sizeId") UUID sizeId, @Param("price") BigDecimal price,
                    @Param("salePrice") BigDecimal salePrice, @Param("stock") Integer stock, @Param("status") String status);
     void updateSku(@Param("id") UUID id, @Param("productId") UUID productId, @Param("variantId") UUID variantId,
-                   @Param("skuCode") String skuCode, @Param("size") String size, @Param("price") BigDecimal price,
+                   @Param("skuCode") String skuCode, @Param("sizeId") UUID sizeId, @Param("price") BigDecimal price,
                    @Param("salePrice") BigDecimal salePrice, @Param("stock") Integer stock, @Param("status") String status);
     void softDeleteSku(@Param("id") UUID id, @Param("productId") UUID productId);
 }
