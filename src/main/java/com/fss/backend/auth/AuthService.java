@@ -39,11 +39,11 @@ public class AuthService {
     }
 
     public AuthDtos.TokenResponse refresh(AuthDtos.RefreshRequest request) {
-        UUID adminId = authMapper.findAdminIdByRefreshToken(request.refreshToken());
+        String adminId = authMapper.findAdminIdByRefreshToken(request.refreshToken());
         if (adminId == null) {
             throw new ApiException("Refresh token invalid or expired");
         }
-        var admin = authMapper.findAdminById(adminId);
+        var admin = authMapper.findAdminById(UUID.fromString(adminId));
         var access = jwtProvider.newAccessToken(admin.id(), admin.role());
         var refresh = jwtProvider.newRefreshToken(admin.id());
         authMapper.deleteRefreshToken(request.refreshToken());

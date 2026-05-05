@@ -127,20 +127,20 @@ public class ProductService {
         }
 
         Map<UUID, UUID> clientVariantIds = new HashMap<>();
-        java.util.Set<UUID> keepVariantIds = new java.util.HashSet<>();
+        java.util.Set<String> keepVariantIds = new java.util.HashSet<>();
         if (variants != null) {
             for (VariantRequest variant : variants) {
                 UUID id = upsertVariant(productId, variant);
-                keepVariantIds.add(id);
+                keepVariantIds.add(id.toString());
                 if (variant.clientId() != null) clientVariantIds.put(variant.clientId(), id);
             }
         }
 
-        java.util.Set<UUID> keepSkuIds = new java.util.HashSet<>();
+        java.util.Set<String> keepSkuIds = new java.util.HashSet<>();
         if (skus != null) {
             for (SkuRequest sku : skus) {
                 UUID id = upsertSku(productId, sku, clientVariantIds);
-                keepSkuIds.add(id);
+                keepSkuIds.add(id.toString());
             }
         }
         mapper.softDeleteMissingSkus(productId, keepSkuIds);

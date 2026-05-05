@@ -1,5 +1,6 @@
 package com.fss.backend.shared.ecommerce;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fss.backend.auth.CurrentAdmin;
 import com.fss.backend.common.ApiException;
 import com.fss.backend.file.FileAssetRepository;
@@ -138,6 +139,17 @@ public class EcommerceSupport {
 
     public String json(String value) {
         return value == null || value.isBlank() ? "{}" : value;
+    }
+
+    public String json(JsonNode value) {
+        if (value == null || value.isNull()) {
+            return "{}";
+        }
+        if (value.isTextual()) {
+            String text = value.asText();
+            return text == null || text.isBlank() ? "{}" : text;
+        }
+        return value.toString();
     }
 
     public void require(boolean ok, String message) {

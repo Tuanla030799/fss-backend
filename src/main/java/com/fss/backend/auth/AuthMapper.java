@@ -15,6 +15,6 @@ public interface AuthMapper {
 
     void insertRefreshToken(@Param("id") UUID id, @Param("adminId") UUID adminId,
                             @Param("token") String token, @Param("expiresAt") OffsetDateTime expiresAt);
-    UUID findAdminIdByRefreshToken(@Param("token") String token);
+    String findAdminIdByRefreshToken(@Param("token") String token);
     void deleteRefreshToken(@Param("token") String token);
 }

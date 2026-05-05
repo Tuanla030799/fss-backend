@@ -19,11 +19,17 @@ import java.io.IOException;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
+    private static final String ADMIN_AUTH_PATH = "/api/admin/auth/";
 
     private final JwtProvider jwtProvider;
 
     public JwtAuthenticationFilter(JwtProvider jwtProvider) {
         this.jwtProvider = jwtProvider;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return request.getServletPath().startsWith(ADMIN_AUTH_PATH);
     }
 
     @Override

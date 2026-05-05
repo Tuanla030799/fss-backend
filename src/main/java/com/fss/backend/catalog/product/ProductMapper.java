@@ -44,7 +44,7 @@ public interface ProductMapper {
                      @Param("sortOrder") Integer sortOrder, @Param("isPrimary") Boolean isPrimary);
     List<ProductVariant> listVariants(@Param("productId") UUID productId);
     void deleteVariants(@Param("productId") UUID productId);
-    void softDeleteMissingVariants(@Param("productId") UUID productId, @Param("keepIds") Set<UUID> keepIds);
+    void softDeleteMissingVariants(@Param("productId") UUID productId, @Param("keepIds") Set<String> keepIds);
     ProductVariant findVariantById(@Param("id") UUID id, @Param("productId") UUID productId);
     void insertVariant(@Param("id") UUID id, @Param("productId") UUID productId, @Param("name") String name,
                        @Param("colorName") String colorName, @Param("colorCode") String colorCode,
@@ -57,7 +57,7 @@ public interface ProductMapper {
     void softDeleteVariant(@Param("id") UUID id, @Param("productId") UUID productId);
     List<Sku> listSkus(@Param("productId") UUID productId);
     void deleteSkus(@Param("productId") UUID productId);
-    void softDeleteMissingSkus(@Param("productId") UUID productId, @Param("keepIds") Set<UUID> keepIds);
+    void softDeleteMissingSkus(@Param("productId") UUID productId, @Param("keepIds") Set<String> keepIds);
     Sku findSkuById(@Param("id") UUID id, @Param("productId") UUID productId);
     int countSkuCode(@Param("skuCode") String skuCode, @Param("excludeId") UUID excludeId);
     void insertSku(@Param("id") UUID id, @Param("productId") UUID productId, @Param("variantId") UUID variantId,
