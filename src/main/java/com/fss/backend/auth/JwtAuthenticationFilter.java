@@ -19,6 +19,7 @@ import java.io.IOException;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
+    private static final String ADMIN_PATH = "/api/admin/";
     private static final String ADMIN_AUTH_PATH = "/api/admin/auth/";
 
     private final JwtProvider jwtProvider;
@@ -29,7 +30,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return request.getServletPath().startsWith(ADMIN_AUTH_PATH);
+        String path = request.getServletPath();
+        return path.startsWith(ADMIN_AUTH_PATH) || !path.startsWith(ADMIN_PATH);
     }
 
     @Override
