@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.fss.backend.content.blog.BlogPostMapper">
     <sql id="postSelect">
-        p.id, p.title, p.slug, p.excerpt, p.content_json::text AS content_json, p.cover_file_id,
+        p.id, p.title, p.slug, p.excerpt, p.content_json::text AS content_json, p.content_html, p.cover_file_id,
         f.path AS cover_image_url, p.status, p.published_at, p.created_at
     </sql>
 
@@ -40,13 +40,13 @@
     </select>
 
     <insert id="insertPost">
-        INSERT INTO blog_posts(id,title,slug,excerpt,content_json,cover_file_id,status,published_at,created_by,updated_by)
-        VALUES(#{id},#{title},#{slug},#{excerpt},CAST(#{contentJson} AS jsonb),#{coverFileId},#{status},#{publishedAt},#{adminId},#{adminId})
+        INSERT INTO blog_posts(id,title,slug,excerpt,content_json,content_html,cover_file_id,status,published_at,created_by,updated_by)
+        VALUES(#{id},#{title},#{slug},#{excerpt},CAST(#{contentJson} AS jsonb),#{contentHtml},#{coverFileId},#{status},#{publishedAt},#{adminId},#{adminId})
     </insert>
 
     <update id="updatePost">
         UPDATE blog_posts
-        SET title=#{title}, slug=#{slug}, excerpt=#{excerpt}, content_json=CAST(#{contentJson} AS jsonb),
+        SET title=#{title}, slug=#{slug}, excerpt=#{excerpt}, content_json=CAST(#{contentJson} AS jsonb), content_html=#{contentHtml},
             cover_file_id=#{coverFileId}, status=#{status}, published_at=#{publishedAt}, updated_by=#{adminId}
         WHERE id=#{id} AND deleted_at IS NULL
     </update>

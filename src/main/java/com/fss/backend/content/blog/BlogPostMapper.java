@@ -20,11 +20,13 @@ public interface BlogPostMapper {
 
     void insertPost(@Param("id") UUID id, @Param("title") String title, @Param("slug") String slug,
                     @Param("excerpt") String excerpt, @Param("contentJson") String contentJson,
+                    @Param("contentHtml") String contentHtml,
                     @Param("coverFileId") UUID coverFileId, @Param("status") String status,
                     @Param("publishedAt") OffsetDateTime publishedAt, @Param("adminId") UUID adminId);
 
     void updatePost(@Param("id") UUID id, @Param("title") String title, @Param("slug") String slug,
                     @Param("excerpt") String excerpt, @Param("contentJson") String contentJson,
+                    @Param("contentHtml") String contentHtml,
                     @Param("coverFileId") UUID coverFileId, @Param("status") String status,
                     @Param("publishedAt") OffsetDateTime publishedAt, @Param("adminId") UUID adminId);
 

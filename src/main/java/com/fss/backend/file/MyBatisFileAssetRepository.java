@@ -25,6 +25,11 @@ public class MyBatisFileAssetRepository implements FileAssetRepository {
     }
 
     @Override
+    public FileAsset findByPath(String path) {
+        return mapper.findByPath(path);
+    }
+
+    @Override
     public void updateStatus(UUID id, String status, UUID updatedBy) {
         mapper.updateStatus(id, status, updatedBy);
     }

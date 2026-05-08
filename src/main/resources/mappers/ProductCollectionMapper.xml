@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.fss.backend.content.collection.ProductCollectionMapper">
     <sql id="collectionSelect">
-        c.id, c.name, c.slug, c.description, c.file_id, f.path AS image_url, c.status, c.sort_order,
+        c.id, c.name, c.slug, c.description, c.description AS description_html, c.file_id, f.path AS image_url, c.status, c.sort_order,
         COUNT(cp.product_id)::int AS product_count, c.created_at
     </sql>
 

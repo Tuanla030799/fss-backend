@@ -5,6 +5,8 @@ import com.fss.backend.catalog.brand.BrandMapper;
 import com.fss.backend.catalog.category.CategoryMapper;
 import com.fss.backend.catalog.sku.Sku;
 import com.fss.backend.catalog.sku.SkuRequest;
+import com.fss.backend.content.html.HtmlContentImageUsageService;
+import com.fss.backend.content.html.HtmlSanitizerService;
 import com.fss.backend.masterdata.ColorOption;
 import com.fss.backend.masterdata.SizeColorMapper;
 import com.fss.backend.masterdata.SizeOption;
@@ -27,14 +29,20 @@ public class ProductService {
     private final BrandMapper brandMapper;
     private final SizeColorMapper sizeColorMapper;
     private final EcommerceSupport support;
+    private final HtmlSanitizerService htmlSanitizerService;
+    private final HtmlContentImageUsageService htmlContentImageUsageService;
 
     public ProductService(ProductMapper mapper, CategoryMapper categoryMapper, BrandMapper brandMapper,
-                          SizeColorMapper sizeColorMapper, EcommerceSupport support) {
+                          SizeColorMapper sizeColorMapper, EcommerceSupport support,
+                          HtmlSanitizerService htmlSanitizerService,
+                          HtmlContentImageUsageService htmlContentImageUsageService) {
         this.mapper = mapper;
         this.categoryMapper = categoryMapper;
         this.brandMapper = brandMapper;
         this.sizeColorMapper = sizeColorMapper;
         this.support = support;
+        this.htmlSanitizerService = htmlSanitizerService;
+        this.htmlContentImageUsageService = htmlContentImageUsageService;
     }
 
     public List<ProductSummary> listPublicProducts(UUID categoryId, String categorySlug, UUID brandId, String brandSlug, String gender, String keyword, String size,
@@ -72,10 +80,13 @@ public class ProductService {
         support.require(categoryMapper.findCategoryById(request.categoryId()) != null, "Category not found");
         requireBrandExists(request.brandId());
         UUID id = UUID.randomUUID();
+        ContentPayload content = contentPayload(request);
         mapper.insertProduct(id, request.categoryId(), request.brandId(), support.normalizeProductGenderDefault(request.gender()),
                 support.trimRequired(request.name(), "Product name"), uniqueSlug(request.slug(), request.name(), null),
-                support.trimToNull(request.shortDescription()), support.json(request.descriptionJson()), support.normalizeProductStatusDefault(request.status()),
+                support.trimToNull(request.shortDescription()), content.legacyJson(), content.html(),
+                support.normalizeProductStatusDefault(request.status()),
                 support.bool(request.isFeatured()), support.nz(request.featuredOrder()), support.adminId());
+        htmlContentImageUsageService.activateImages(content.html());
         replaceProductChildren(id, request.images(), request.variants(), request.skus());
         return id;
     }
@@ -86,10 +97,13 @@ public class ProductService {
         support.require(mapper.findProductSummaryById(id) != null, "Product not found");
         support.require(categoryMapper.findCategoryById(request.categoryId()) != null, "Category not found");
         requireBrandExists(request.brandId());
+        ContentPayload content = contentPayload(request);
         mapper.updateProduct(id, request.categoryId(), request.brandId(), support.normalizeProductGenderDefault(request.gender()),
                 support.trimRequired(request.name(), "Product name"), uniqueSlug(request.slug(), request.name(), id),
-                support.trimToNull(request.shortDescription()), support.json(request.descriptionJson()), support.normalizeProductStatusDefault(request.status()),
+                support.trimToNull(request.shortDescription()), content.legacyJson(), content.html(),
+                support.normalizeProductStatusDefault(request.status()),
                 support.bool(request.isFeatured()), support.nz(request.featuredOrder()), support.adminId());
+        htmlContentImageUsageService.activateImages(content.html());
         replaceProductChildren(id, request.images(), request.variants(), request.skus());
     }
 
@@ -114,13 +128,27 @@ public class ProductService {
         List<Sku> skus = mapper.listSkus(summary.id());
         return new ProductDetail(summary.id(), summary.categoryId(), summary.categoryName(), summary.brandId(), summary.brandName(),
                 summary.brandSlug(), summary.gender(), summary.name(), summary.slug(),
-                summary.shortDescription(), loadDescriptionJson(summary.id()), summary.status(), summary.isFeatured(),
+                summary.shortDescription(), "{}", loadDescriptionHtml(summary.id()), summary.status(), summary.isFeatured(),
                 summary.featuredOrder(), summary.createdAt(), images, variants, skus);
     }
 
-    private String loadDescriptionJson(UUID productId) {
-        String json = mapper.findProductDescriptionJson(productId);
-        return json == null || json.isBlank() ? "{}" : json;
+    private String loadDescriptionHtml(UUID productId) {
+        return mapper.findProductDescriptionHtml(productId);
+    }
+
+    private ContentPayload contentPayload(ProductRequest request) {
+        String html = request.descriptionHtml();
+        if (request.descriptionJson() != null && request.descriptionJson().isTextual()) {
+            String text = request.descriptionJson().asText();
+            if (html == null && looksLikeHtml(text)) {
+                html = text;
+            }
+        }
+        return new ContentPayload("{}", htmlSanitizerService.sanitize(html));
+    }
+
+    private boolean looksLikeHtml(String value) {
+        return value != null && value.trim().startsWith("<");
     }
 
     private void replaceProductChildren(UUID productId, List<ProductImageRequest> images, List<VariantRequest> variants, List<SkuRequest> skus) {
@@ -255,4 +283,5 @@ public class ProductService {
 
     private record SizeValue(UUID id, String value) {}
     private record ColorValue(UUID id, String name, String colorCode) {}
+    private record ContentPayload(String legacyJson, String html) {}
 }

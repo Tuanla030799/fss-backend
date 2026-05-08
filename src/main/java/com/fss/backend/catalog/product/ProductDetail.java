@@ -8,6 +8,6 @@ import java.util.UUID;
 
 public record ProductDetail(UUID id, UUID categoryId, String categoryName, UUID brandId, String brandName, String brandSlug,
                             String gender, String name, String slug,
-                            String shortDescription, String descriptionJson, String status, Boolean isFeatured,
+                            String shortDescription, String descriptionJson, String descriptionHtml, String status, Boolean isFeatured,
                             Integer featuredOrder, OffsetDateTime createdAt,
                             List<ProductImage> images, List<ProductVariant> variants, List<Sku> skus) {}

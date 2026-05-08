@@ -21,18 +21,21 @@ public interface ProductMapper {
                                       @Param("limit") int limit, @Param("offset") int offset);
     ProductSummary findProductSummaryById(@Param("id") UUID id);
     String findProductDescriptionJson(@Param("id") UUID id);
+    String findProductDescriptionHtml(@Param("id") UUID id);
     ProductSummary findProductSummaryBySlug(@Param("slug") String slug, @Param("publicOnly") boolean publicOnly);
     int countProductSlug(@Param("slug") String slug, @Param("excludeId") UUID excludeId);
     void insertProduct(@Param("id") UUID id, @Param("categoryId") UUID categoryId, @Param("brandId") UUID brandId,
                        @Param("gender") String gender, @Param("name") String name,
                        @Param("slug") String slug, @Param("shortDescription") String shortDescription,
-                       @Param("descriptionJson") String descriptionJson, @Param("status") String status,
+                       @Param("descriptionJson") String descriptionJson, @Param("descriptionHtml") String descriptionHtml,
+                       @Param("status") String status,
                        @Param("isFeatured") Boolean isFeatured, @Param("featuredOrder") Integer featuredOrder,
                        @Param("adminId") UUID adminId);
     void updateProduct(@Param("id") UUID id, @Param("categoryId") UUID categoryId, @Param("brandId") UUID brandId,
                        @Param("gender") String gender, @Param("name") String name,
                        @Param("slug") String slug, @Param("shortDescription") String shortDescription,
-                       @Param("descriptionJson") String descriptionJson, @Param("status") String status,
+                       @Param("descriptionJson") String descriptionJson, @Param("descriptionHtml") String descriptionHtml,
+                       @Param("status") String status,
                        @Param("isFeatured") Boolean isFeatured, @Param("featuredOrder") Integer featuredOrder,
                        @Param("adminId") UUID adminId);
     void updateProductStatus(@Param("id") UUID id, @Param("status") String status, @Param("adminId") UUID adminId);

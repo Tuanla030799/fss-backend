@@ -1,5 +1,7 @@
 package com.fss.backend.content.blog;
 
+import com.fss.backend.content.html.HtmlContentImageUsageService;
+import com.fss.backend.content.html.HtmlSanitizerService;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,10 +17,16 @@ public class BlogPostService {
 
     private final BlogPostMapper mapper;
     private final EcommerceSupport support;
+    private final HtmlSanitizerService htmlSanitizerService;
+    private final HtmlContentImageUsageService htmlContentImageUsageService;
 
-    public BlogPostService(BlogPostMapper mapper, EcommerceSupport support) {
+    public BlogPostService(BlogPostMapper mapper, EcommerceSupport support,
+                           HtmlSanitizerService htmlSanitizerService,
+                           HtmlContentImageUsageService htmlContentImageUsageService) {
         this.mapper = mapper;
         this.support = support;
+        this.htmlSanitizerService = htmlSanitizerService;
+        this.htmlContentImageUsageService = htmlContentImageUsageService;
     }
 
     public List<BlogPost> listPublicPosts(String keyword, int page, int limit) {
@@ -48,9 +56,11 @@ public class BlogPostService {
         UUID id = UUID.randomUUID();
         support.activateFile(request.coverFileId());
         String status = normalizePostStatusDefault(request.status());
+        ContentPayload content = contentPayload(request);
         mapper.insertPost(id, request.title().trim(), uniqueSlug(request.slug(), request.title(), null),
-                request.excerpt(), support.json(request.contentJson()), request.coverFileId(), status,
+                request.excerpt(), content.legacyJson(), content.html(), request.coverFileId(), status,
                 normalizePublishedAt(status, request.publishedAt()), support.adminId());
+        htmlContentImageUsageService.activateImages(content.html());
         return id;
     }
 
@@ -59,9 +69,11 @@ public class BlogPostService {
         support.require(mapper.findPostById(id) != null, "Blog post not found");
         support.activateFile(request.coverFileId());
         String status = normalizePostStatusDefault(request.status());
+        ContentPayload content = contentPayload(request);
         mapper.updatePost(id, request.title().trim(), uniqueSlug(request.slug(), request.title(), id),
-                request.excerpt(), support.json(request.contentJson()), request.coverFileId(), status,
+                request.excerpt(), content.legacyJson(), content.html(), request.coverFileId(), status,
                 normalizePublishedAt(status, request.publishedAt()), support.adminId());
+        htmlContentImageUsageService.activateImages(content.html());
     }
 
     @Transactional
@@ -95,7 +107,21 @@ public class BlogPostService {
 
     private BlogPost withCoverUrl(BlogPost post) {
         return post == null || post.coverImageUrl() == null ? post : new BlogPost(post.id(), post.title(), post.slug(),
-                post.excerpt(), post.contentJson(), post.coverFileId(), support.publicUrl(post.coverImageUrl()),
+                post.excerpt(), "{}", post.contentHtml(), post.coverFileId(), support.publicUrl(post.coverImageUrl()),
                 post.status(), post.publishedAt(), post.createdAt());
     }
+
+    private ContentPayload contentPayload(BlogPostRequest request) {
+        String html = request.contentHtml();
+        if (html == null && looksLikeHtml(request.contentJson())) {
+            html = request.contentJson();
+        }
+        return new ContentPayload("{}", htmlSanitizerService.sanitize(html));
+    }
+
+    private boolean looksLikeHtml(String value) {
+        return value != null && value.trim().startsWith("<");
+    }
+
+    private record ContentPayload(String legacyJson, String html) {}
 }

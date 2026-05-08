@@ -2,6 +2,8 @@ package com.fss.backend.content.collection;
 
 import com.fss.backend.catalog.product.ProductMapper;
 import com.fss.backend.catalog.product.ProductSummary;
+import com.fss.backend.content.html.HtmlContentImageUsageService;
+import com.fss.backend.content.html.HtmlSanitizerService;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,11 +16,17 @@ public class ProductCollectionService {
     private final ProductCollectionMapper mapper;
     private final ProductMapper productMapper;
     private final EcommerceSupport support;
+    private final HtmlSanitizerService htmlSanitizerService;
+    private final HtmlContentImageUsageService htmlContentImageUsageService;
 
-    public ProductCollectionService(ProductCollectionMapper mapper, ProductMapper productMapper, EcommerceSupport support) {
+    public ProductCollectionService(ProductCollectionMapper mapper, ProductMapper productMapper, EcommerceSupport support,
+                                    HtmlSanitizerService htmlSanitizerService,
+                                    HtmlContentImageUsageService htmlContentImageUsageService) {
         this.mapper = mapper;
         this.productMapper = productMapper;
         this.support = support;
+        this.htmlSanitizerService = htmlSanitizerService;
+        this.htmlContentImageUsageService = htmlContentImageUsageService;
     }
 
     public List<ProductCollection> listPublicCollections(String keyword, int page, int limit) {
@@ -43,10 +51,12 @@ public class ProductCollectionService {
     public UUID createCollection(ProductCollectionRequest request) {
         UUID id = UUID.randomUUID();
         support.activateFile(request.fileId());
+        String descriptionHtml = sanitizeCollectionDescription(request);
         mapper.insertCollection(id, request.name().trim(), uniqueSlug(request.slug(), request.name(), null),
-                request.description(), request.fileId(),
+                descriptionHtml, request.fileId(),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
                 support.nz(request.sortOrder()), support.adminId());
+        htmlContentImageUsageService.activateImages(descriptionHtml);
         replaceProducts(id, request.products());
         return id;
     }
@@ -55,10 +65,12 @@ public class ProductCollectionService {
     public void updateCollection(UUID id, ProductCollectionRequest request) {
         support.require(mapper.findCollectionById(id) != null, "Collection not found");
         support.activateFile(request.fileId());
+        String descriptionHtml = sanitizeCollectionDescription(request);
         mapper.updateCollection(id, request.name().trim(), uniqueSlug(request.slug(), request.name(), id),
-                request.description(), request.fileId(),
+                descriptionHtml, request.fileId(),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
                 support.nz(request.sortOrder()), support.adminId());
+        htmlContentImageUsageService.activateImages(descriptionHtml);
         replaceProducts(id, request.products());
     }
 
@@ -73,9 +85,14 @@ public class ProductCollectionService {
         ProductCollection normalized = withCollectionUrl(collection);
         List<ProductSummary> products = mapper.listCollectionProducts(collection.id(), publicOnly, support.safeLimit(limit), support.offset(page, limit))
                 .stream().map(this::withProductUrl).toList();
-        return new ProductCollectionDetail(normalized.id(), normalized.name(), normalized.slug(), normalized.description(),
+        return new ProductCollectionDetail(normalized.id(), normalized.name(), normalized.slug(), normalized.description(), normalized.descriptionHtml(),
                 normalized.fileId(), normalized.imageUrl(), normalized.status(),
                 normalized.sortOrder(), normalized.productCount(), normalized.createdAt(), products);
+    }
+
+    private String sanitizeCollectionDescription(ProductCollectionRequest request) {
+        String html = request.descriptionHtml() == null ? request.description() : request.descriptionHtml();
+        return htmlSanitizerService.sanitize(html);
     }
 
     private void replaceProducts(UUID collectionId, List<CollectionProductRequest> products) {
@@ -95,7 +112,7 @@ public class ProductCollectionService {
 
     private ProductCollection withCollectionUrl(ProductCollection collection) {
         return collection == null || collection.imageUrl() == null ? collection : new ProductCollection(collection.id(),
-                collection.name(), collection.slug(), collection.description(),
+                collection.name(), collection.slug(), collection.description(), collection.descriptionHtml(),
                 collection.fileId(), support.publicUrl(collection.imageUrl()), collection.status(), collection.sortOrder(),
                 collection.productCount(), collection.createdAt());
     }

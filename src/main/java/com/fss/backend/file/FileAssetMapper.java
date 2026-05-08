@@ -12,6 +12,7 @@ public interface FileAssetMapper {
     void create(@Param("id") UUID id, @Param("path") String path, @Param("status") String status,
                 @Param("createdBy") UUID createdBy);
     FileAsset findById(@Param("id") UUID id);
+    FileAsset findByPath(@Param("path") String path);
     void updateStatus(@Param("id") UUID id, @Param("status") String status, @Param("updatedBy") UUID updatedBy);
     List<FileAsset> listInactiveCreatedBefore(@Param("cutoff") OffsetDateTime cutoff);
     void deleteById(@Param("id") UUID id);

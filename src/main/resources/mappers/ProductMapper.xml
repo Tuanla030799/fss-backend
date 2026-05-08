@@ -42,6 +42,9 @@
     <select id="findProductDescriptionJson" resultType="string">
         SELECT description_json::text FROM products WHERE id=#{id} AND deleted_at IS NULL
     </select>
+    <select id="findProductDescriptionHtml" resultType="string">
+        SELECT description_html FROM products WHERE id=#{id} AND deleted_at IS NULL
+    </select>
     <select id="findProductSummaryById" resultType="com.fss.backend.catalog.product.ProductSummary">
         SELECT <include refid="productSummarySelect" />
         FROM products p JOIN categories c ON c.id=p.category_id
@@ -66,11 +69,11 @@
         SELECT COUNT(*) FROM products WHERE slug=#{slug} AND deleted_at IS NULL <if test="excludeId != null">AND id != #{excludeId}</if>
     </select>
     <insert id="insertProduct">
-        INSERT INTO products(id,category_id,brand_id,gender,name,slug,short_description,description_json,status,is_featured,featured_order,created_by,updated_by)
-        VALUES(#{id},#{categoryId},#{brandId},#{gender},#{name},#{slug},#{shortDescription},CAST(#{descriptionJson} AS jsonb),#{status},#{isFeatured},#{featuredOrder},#{adminId},#{adminId})
+        INSERT INTO products(id,category_id,brand_id,gender,name,slug,short_description,description_json,description_html,status,is_featured,featured_order,created_by,updated_by)
+        VALUES(#{id},#{categoryId},#{brandId},#{gender},#{name},#{slug},#{shortDescription},CAST(#{descriptionJson} AS jsonb),#{descriptionHtml},#{status},#{isFeatured},#{featuredOrder},#{adminId},#{adminId})
     </insert>
     <update id="updateProduct">
-        UPDATE products SET category_id=#{categoryId}, brand_id=#{brandId}, gender=#{gender}, name=#{name}, slug=#{slug}, short_description=#{shortDescription}, description_json=CAST(#{descriptionJson} AS jsonb), status=#{status}, is_featured=#{isFeatured}, featured_order=#{featuredOrder}, updated_by=#{adminId} WHERE id=#{id}
+        UPDATE products SET category_id=#{categoryId}, brand_id=#{brandId}, gender=#{gender}, name=#{name}, slug=#{slug}, short_description=#{shortDescription}, description_json=CAST(#{descriptionJson} AS jsonb), description_html=#{descriptionHtml}, status=#{status}, is_featured=#{isFeatured}, featured_order=#{featuredOrder}, updated_by=#{adminId} WHERE id=#{id}
     </update>
     <update id="updateProductStatus">UPDATE products SET status=#{status}, updated_by=#{adminId} WHERE id=#{id}</update>
     <update id="softDeleteProduct">UPDATE products SET deleted_at=now(), updated_by=#{adminId} WHERE id=#{id}</update>

@@ -12,6 +12,12 @@
         WHERE id = #{id}
     </select>
 
+    <select id="findByPath" resultType="com.fss.backend.file.FileAsset">
+        SELECT id, path, status, created_at
+        FROM files
+        WHERE path = #{path}
+    </select>
+
     <update id="updateStatus">
         UPDATE files
         SET status = #{status}, updated_by = #{updatedBy}
