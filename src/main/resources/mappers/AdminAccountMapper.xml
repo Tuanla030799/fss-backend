@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.fss.backend.auth.account.AdminAccountMapper">
     <select id="listAdminAccounts" resultType="com.fss.backend.auth.account.AdminAccount">SELECT id,name,email,role,status,created_at FROM admin_users <where>deleted_at IS NULL <if test="keyword != null and keyword != ''">AND (name ILIKE CONCAT('%',#{keyword},'%') OR email ILIKE CONCAT('%',#{keyword},'%'))</if></where> ORDER BY created_at DESC LIMIT #{limit} OFFSET #{offset}</select>
-    <select id="findAdminAccountById" resultType="com.fss.backend.auth.account.AdminAccount">SELECT id,name,email,role,status,created_at FROM admin_users WHERE id=#{id}AND deleted_at IS NULL</select>
+    <select id="findAdminAccountById" resultType="com.fss.backend.auth.account.AdminAccount">SELECT id,name,email,role,status,created_at FROM admin_users WHERE id=#{id} AND deleted_at IS NULL</select>
     <select id="countAdminEmail" resultType="int">SELECT COUNT(*) FROM admin_users WHERE email=#{email} AND deleted_at IS NULL <if test="excludeId != null">AND id != #{excludeId}</if></select>
     <insert id="insertAdminAccount">INSERT INTO admin_users(id,name,email,password_hash,role,status) VALUES(#{id},#{name},#{email},#{passwordHash},#{role},#{status})</insert>
     <update id="updateAdminAccount">UPDATE admin_users SET name=#{name},email=#{email},<if test="passwordHash != null">password_hash=#{passwordHash},</if>role=#{role},status=#{status} WHERE id=#{id}</update>
