@@ -18,6 +18,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -122,7 +123,7 @@ public class FileService {
 
     @Scheduled(fixedDelayString = "${app.file-cleanup.fixed-delay-ms:60000}")
     public void cleanupInactiveFiles() {
-        cleanupInactiveFiles(OffsetDateTime.now().minusMinutes(10));
+        cleanupInactiveFiles(OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(10));
     }
 
     @Transactional

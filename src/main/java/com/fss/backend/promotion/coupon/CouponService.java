@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -57,7 +58,7 @@ public class CouponService {
     public Coupon requireValidCoupon(String code, BigDecimal subtotal) {
         Coupon coupon = mapper.findCouponByCode(code);
         support.require(coupon != null && EcommerceSupport.ACTIVE.equals(coupon.status()), "Coupon is invalid");
-        OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         support.require(coupon.startsAt() == null || !coupon.startsAt().isAfter(now), "Coupon has not started");
         support.require(coupon.endsAt() == null || !coupon.endsAt().isBefore(now), "Coupon has expired");
         support.require(coupon.usageLimit() == null || coupon.usedCount() < coupon.usageLimit(), "Coupon usage limit reached");

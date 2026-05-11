@@ -5,6 +5,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 @Service
@@ -34,7 +35,7 @@ public class AuthService {
         }
         var access = jwtProvider.newAccessToken(admin.id(), admin.role());
         var refresh = jwtProvider.newRefreshToken(admin.id());
-        authMapper.insertRefreshToken(UUID.randomUUID(), admin.id(), refresh, OffsetDateTime.now().plusDays(30));
+        authMapper.insertRefreshToken(UUID.randomUUID(), admin.id(), refresh, OffsetDateTime.now(ZoneOffset.UTC).plusDays(30));
         return new AuthDtos.TokenResponse(access, refresh);
     }
 
@@ -47,7 +48,7 @@ public class AuthService {
         var access = jwtProvider.newAccessToken(admin.id(), admin.role());
         var refresh = jwtProvider.newRefreshToken(admin.id());
         authMapper.deleteRefreshToken(request.refreshToken());
-        authMapper.insertRefreshToken(UUID.randomUUID(), admin.id(), refresh, OffsetDateTime.now().plusDays(30));
+        authMapper.insertRefreshToken(UUID.randomUUID(), admin.id(), refresh, OffsetDateTime.now(ZoneOffset.UTC).plusDays(30));
         return new AuthDtos.TokenResponse(access, refresh);
     }
 

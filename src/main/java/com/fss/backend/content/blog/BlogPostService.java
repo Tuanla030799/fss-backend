@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -84,7 +85,7 @@ public class BlogPostService {
 
     private OffsetDateTime normalizePublishedAt(String status, OffsetDateTime publishedAt) {
         if (publishedAt != null) return publishedAt;
-        return EcommerceSupport.ACTIVE.equals(status) ? OffsetDateTime.now() : null;
+        return EcommerceSupport.ACTIVE.equals(status) ? OffsetDateTime.now(ZoneOffset.UTC) : null;
     }
 
     private String normalizePostStatusNullable(String status) {
