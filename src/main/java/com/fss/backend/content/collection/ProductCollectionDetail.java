@@ -6,7 +6,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
-public record ProductCollectionDetail(UUID id, String name, String slug, String description, String descriptionHtml,
+public record ProductCollectionDetail(UUID id, String name, String slug, String excerpt, String descriptionHtml,
                                       UUID fileId, String imageUrl, String status, Integer sortOrder,
                                       Integer productCount, OffsetDateTime createdAt,
                                       List<ProductSummary> products) {}

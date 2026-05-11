@@ -2,8 +2,10 @@ package com.fss.backend.common;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -26,10 +28,30 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(new ApiResponse<>(false, msg, null));
     }
 
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMethodValidation(HandlerMethodValidationException ex) {
+        var msg = ex.getAllValidationResults().stream().findFirst()
+                .flatMap(result -> result.getResolvableErrors().stream().findFirst()
+                        .map(error -> parameterName(result) + " " + message(error)))
+                .orElse("Validation failed");
+        log.warn("Validation failed: {}", msg);
+        return ResponseEntity.badRequest().body(new ApiResponse<>(false, msg, null));
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Void>> handleUnreadableMessage(HttpMessageNotReadableException ex) {
         log.warn("Invalid request body: {}", ex.getMessage());
         return ResponseEntity.badRequest().body(new ApiResponse<>(false, "Invalid request body", null));
+    }
+
+    private String parameterName(org.springframework.validation.method.ParameterValidationResult result) {
+        String name = result.getMethodParameter().getParameterName();
+        return name == null ? "parameter" : name;
+    }
+
+    private String message(MessageSourceResolvable error) {
+        String message = error.getDefaultMessage();
+        return message == null ? "is invalid" : message;
     }
 
     @ExceptionHandler(Exception.class)

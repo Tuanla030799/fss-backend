@@ -22,11 +22,13 @@ public interface ProductCollectionMapper {
     int countCollectionSlug(@Param("slug") String slug, @Param("excludeId") UUID excludeId);
 
     void insertCollection(@Param("id") UUID id, @Param("name") String name, @Param("slug") String slug,
-                          @Param("description") String description, @Param("fileId") UUID fileId, @Param("status") String status,
+                          @Param("excerpt") String excerpt, @Param("descriptionHtml") String descriptionHtml,
+                          @Param("fileId") UUID fileId, @Param("status") String status,
                           @Param("sortOrder") Integer sortOrder, @Param("adminId") UUID adminId);
 
     void updateCollection(@Param("id") UUID id, @Param("name") String name, @Param("slug") String slug,
-                          @Param("description") String description, @Param("fileId") UUID fileId, @Param("status") String status,
+                          @Param("excerpt") String excerpt, @Param("descriptionHtml") String descriptionHtml,
+                          @Param("fileId") UUID fileId, @Param("status") String status,
                           @Param("sortOrder") Integer sortOrder, @Param("adminId") UUID adminId);
 
     void softDeleteCollection(@Param("id") UUID id, @Param("adminId") UUID adminId);

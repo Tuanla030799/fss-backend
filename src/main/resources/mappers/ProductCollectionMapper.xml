@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.fss.backend.content.collection.ProductCollectionMapper">
     <sql id="collectionSelect">
-        c.id, c.name, c.slug, c.description, c.description AS description_html, c.file_id, f.path AS image_url, c.status, c.sort_order,
+        c.id, c.name, c.slug, c.excerpt, c.description_html, c.file_id, f.path AS image_url, c.status, c.sort_order,
         COUNT(cp.product_id)::int AS product_count, c.created_at
     </sql>
 
@@ -25,7 +25,7 @@
             c.deleted_at IS NULL
             <if test="publicOnly">AND c.status = 'ACTIVE'</if>
             <if test="status != null and status != ''">AND c.status = #{status}</if>
-            <if test="keyword != null and keyword != ''">AND (c.name ILIKE CONCAT('%', #{keyword}, '%') OR c.description ILIKE CONCAT('%', #{keyword}, '%'))</if>
+            <if test="keyword != null and keyword != ''">AND (c.name ILIKE CONCAT('%', #{keyword}, '%') OR c.excerpt ILIKE CONCAT('%', #{keyword}, '%') OR c.description_html ILIKE CONCAT('%', #{keyword}, '%'))</if>
         </where>
         GROUP BY c.id, f.path
         ORDER BY c.sort_order ASC, c.created_at DESC
@@ -55,13 +55,13 @@
     </select>
 
     <insert id="insertCollection">
-        INSERT INTO collections(id,name,slug,description,file_id,status,sort_order,created_by,updated_by)
-        VALUES(#{id},#{name},#{slug},#{description},#{fileId},#{status},#{sortOrder},#{adminId},#{adminId})
+        INSERT INTO collections(id,name,slug,excerpt,description_html,file_id,status,sort_order,created_by,updated_by)
+        VALUES(#{id},#{name},#{slug},#{excerpt},#{descriptionHtml},#{fileId},#{status},#{sortOrder},#{adminId},#{adminId})
     </insert>
 
     <update id="updateCollection">
         UPDATE collections
-        SET name=#{name}, slug=#{slug}, description=#{description}, file_id=#{fileId},
+        SET name=#{name}, slug=#{slug}, excerpt=#{excerpt}, description_html=#{descriptionHtml}, file_id=#{fileId},
             status=#{status}, sort_order=#{sortOrder}, updated_by=#{adminId}
         WHERE id=#{id} AND deleted_at IS NULL
     </update>

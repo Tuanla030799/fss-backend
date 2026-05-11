@@ -51,9 +51,10 @@ public class ProductCollectionService {
     public UUID createCollection(ProductCollectionRequest request) {
         UUID id = UUID.randomUUID();
         support.activateFile(request.fileId());
+        String excerpt = collectionExcerpt(request);
         String descriptionHtml = sanitizeCollectionDescription(request);
         mapper.insertCollection(id, request.name().trim(), uniqueSlug(request.slug(), request.name(), null),
-                descriptionHtml, request.fileId(),
+                excerpt, descriptionHtml, request.fileId(),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
                 support.nz(request.sortOrder()), support.adminId());
         htmlContentImageUsageService.activateImages(descriptionHtml);
@@ -65,9 +66,10 @@ public class ProductCollectionService {
     public void updateCollection(UUID id, ProductCollectionRequest request) {
         support.require(mapper.findCollectionById(id) != null, "Collection not found");
         support.activateFile(request.fileId());
+        String excerpt = collectionExcerpt(request);
         String descriptionHtml = sanitizeCollectionDescription(request);
         mapper.updateCollection(id, request.name().trim(), uniqueSlug(request.slug(), request.name(), id),
-                descriptionHtml, request.fileId(),
+                excerpt, descriptionHtml, request.fileId(),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
                 support.nz(request.sortOrder()), support.adminId());
         htmlContentImageUsageService.activateImages(descriptionHtml);
@@ -85,14 +87,18 @@ public class ProductCollectionService {
         ProductCollection normalized = withCollectionUrl(collection);
         List<ProductSummary> products = mapper.listCollectionProducts(collection.id(), publicOnly, support.safeLimit(limit), support.offset(page, limit))
                 .stream().map(this::withProductUrl).toList();
-        return new ProductCollectionDetail(normalized.id(), normalized.name(), normalized.slug(), normalized.description(), normalized.descriptionHtml(),
+        return new ProductCollectionDetail(normalized.id(), normalized.name(), normalized.slug(),
+                normalized.excerpt(), normalized.descriptionHtml(),
                 normalized.fileId(), normalized.imageUrl(), normalized.status(),
                 normalized.sortOrder(), normalized.productCount(), normalized.createdAt(), products);
     }
 
+    private String collectionExcerpt(ProductCollectionRequest request) {
+        return support.trimToNull(request.excerpt());
+    }
+
     private String sanitizeCollectionDescription(ProductCollectionRequest request) {
-        String html = request.descriptionHtml() == null ? request.description() : request.descriptionHtml();
-        return htmlSanitizerService.sanitize(html);
+        return htmlSanitizerService.sanitize(request.descriptionHtml());
     }
 
     private void replaceProducts(UUID collectionId, List<CollectionProductRequest> products) {
@@ -112,7 +118,7 @@ public class ProductCollectionService {
 
     private ProductCollection withCollectionUrl(ProductCollection collection) {
         return collection == null || collection.imageUrl() == null ? collection : new ProductCollection(collection.id(),
-                collection.name(), collection.slug(), collection.description(), collection.descriptionHtml(),
+                collection.name(), collection.slug(), collection.excerpt(), collection.descriptionHtml(),
                 collection.fileId(), support.publicUrl(collection.imageUrl()), collection.status(), collection.sortOrder(),
                 collection.productCount(), collection.createdAt());
     }
