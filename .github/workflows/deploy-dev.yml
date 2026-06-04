@@ -64,6 +64,16 @@ jobs:
           ./scripts/deploy-prod.sh
 
           docker compose --env-file .env.production -f docker-compose.prod.yml ps
-          docker compose --env-file .env.production -f docker-compose.prod.yml exec -T api \
+
+          ATTEMPTS=0
+          until docker compose --env-file .env.production -f docker-compose.prod.yml exec -T api \
             sh -lc 'wget -qO- http://127.0.0.1:8080/api/health || curl -fsS http://127.0.0.1:8080/api/health'
+          do
+            ATTEMPTS=$((ATTEMPTS + 1))
+            if [ "$ATTEMPTS" -ge 12 ]; then
+              docker compose --env-file .env.production -f docker-compose.prod.yml logs --tail=200 api
+              exit 1
+            fi
+            sleep 5
+          done
           EOF
