@@ -1,0 +1,69 @@
+name: Deploy Dev
+
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up SSH key
+        shell: bash
+        env:
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEV_DEPLOY_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+      - name: Add server to known_hosts
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEV_DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEV_DEPLOY_PORT }}
+        run: |
+          set -euo pipefail
+          PORT="${DEPLOY_PORT:-22}"
+          ssh-keyscan -p "$PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy on server
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEV_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEV_DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEV_DEPLOY_PORT }}
+          DEPLOY_PATH: ${{ secrets.DEV_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          PORT="${DEPLOY_PORT:-22}"
+          REMOTE_PATH="${DEPLOY_PATH:-/opt/fds-backend}"
+
+          ssh -p "$PORT" "$DEPLOY_USER@$DEPLOY_HOST" <<EOF
+          set -euo pipefail
+
+          cd "$REMOTE_PATH"
+          git fetch origin dev
+          git checkout dev
+          git pull --ff-only origin dev
+
+          chmod +x scripts/deploy-prod.sh
+          ./scripts/deploy-prod.sh
+
+          docker compose --env-file .env.production -f docker-compose.prod.yml ps
+          docker compose --env-file .env.production -f docker-compose.prod.yml exec -T api \
+            sh -lc 'wget -qO- http://127.0.0.1:8080/api/health || curl -fsS http://127.0.0.1:8080/api/health'
+          EOF
