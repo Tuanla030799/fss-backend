@@ -35,6 +35,11 @@ public class MyBatisFileAssetRepository implements FileAssetRepository {
     }
 
     @Override
+    public int countActiveReferences(UUID id, String path) {
+        return mapper.countActiveReferences(id, path);
+    }
+
+    @Override
     public List<FileAsset> listInactiveCreatedBefore(OffsetDateTime cutoff) {
         return mapper.listInactiveCreatedBefore(cutoff);
     }

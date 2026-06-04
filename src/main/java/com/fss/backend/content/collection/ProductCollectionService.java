@@ -4,6 +4,7 @@ import com.fss.backend.catalog.product.ProductMapper;
 import com.fss.backend.catalog.product.ProductSummary;
 import com.fss.backend.content.html.HtmlContentImageUsageService;
 import com.fss.backend.content.html.HtmlSanitizerService;
+import com.fss.backend.file.FileReferenceService;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,15 +19,18 @@ public class ProductCollectionService {
     private final EcommerceSupport support;
     private final HtmlSanitizerService htmlSanitizerService;
     private final HtmlContentImageUsageService htmlContentImageUsageService;
+    private final FileReferenceService fileReferenceService;
 
     public ProductCollectionService(ProductCollectionMapper mapper, ProductMapper productMapper, EcommerceSupport support,
                                     HtmlSanitizerService htmlSanitizerService,
-                                    HtmlContentImageUsageService htmlContentImageUsageService) {
+                                    HtmlContentImageUsageService htmlContentImageUsageService,
+                                    FileReferenceService fileReferenceService) {
         this.mapper = mapper;
         this.productMapper = productMapper;
         this.support = support;
         this.htmlSanitizerService = htmlSanitizerService;
         this.htmlContentImageUsageService = htmlContentImageUsageService;
+        this.fileReferenceService = fileReferenceService;
     }
 
     public List<ProductCollection> listPublicCollections(String keyword, int page, int limit) {
@@ -64,7 +68,8 @@ public class ProductCollectionService {
 
     @Transactional
     public void updateCollection(UUID id, ProductCollectionRequest request) {
-        support.require(mapper.findCollectionById(id) != null, "Collection not found");
+        ProductCollection existing = mapper.findCollectionById(id);
+        support.require(existing != null, "Collection not found");
         support.activateFile(request.fileId());
         String excerpt = collectionExcerpt(request);
         String descriptionHtml = sanitizeCollectionDescription(request);
@@ -74,12 +79,17 @@ public class ProductCollectionService {
                 support.nz(request.sortOrder()), support.adminId());
         htmlContentImageUsageService.activateImages(descriptionHtml);
         replaceProducts(id, request.products());
+        fileReferenceService.releaseFile(existing.fileId());
+        fileReferenceService.releaseRemovedHtmlImages(existing.descriptionHtml(), descriptionHtml);
     }
 
     @Transactional
     public void deleteCollection(UUID id) {
-        support.require(mapper.findCollectionById(id) != null, "Collection not found");
+        ProductCollection existing = mapper.findCollectionById(id);
+        support.require(existing != null, "Collection not found");
         mapper.softDeleteCollection(id, support.adminId());
+        fileReferenceService.releaseFile(existing.fileId());
+        fileReferenceService.releaseRemovedHtmlImages(existing.descriptionHtml(), null);
     }
 
     private ProductCollectionDetail collectionDetail(ProductCollection collection, boolean publicOnly, int page, int limit) {

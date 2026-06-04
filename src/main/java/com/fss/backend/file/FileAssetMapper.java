@@ -14,6 +14,7 @@ public interface FileAssetMapper {
     FileAsset findById(@Param("id") UUID id);
     FileAsset findByPath(@Param("path") String path);
     void updateStatus(@Param("id") UUID id, @Param("status") String status, @Param("updatedBy") UUID updatedBy);
+    int countActiveReferences(@Param("id") UUID id, @Param("path") String path);
     List<FileAsset> listInactiveCreatedBefore(@Param("cutoff") OffsetDateTime cutoff);
     void deleteById(@Param("id") UUID id);
 }

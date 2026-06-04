@@ -1,6 +1,7 @@
 package com.fss.backend.auth;
 
 import com.fss.backend.common.ApiException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -13,14 +14,22 @@ public class AuthService {
     private final AuthMapper authMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
+    private final boolean allowPublicAdminRegistration;
 
-    public AuthService(AuthMapper authMapper, PasswordEncoder passwordEncoder, JwtProvider jwtProvider) {
+    public AuthService(AuthMapper authMapper,
+                       PasswordEncoder passwordEncoder,
+                       JwtProvider jwtProvider,
+                       @Value("${app.auth.allow-public-admin-registration:true}") boolean allowPublicAdminRegistration) {
         this.authMapper = authMapper;
         this.passwordEncoder = passwordEncoder;
         this.jwtProvider = jwtProvider;
+        this.allowPublicAdminRegistration = allowPublicAdminRegistration;
     }
 
     public void register(AuthDtos.RegisterRequest request) {
+        if (!allowPublicAdminRegistration) {
+            throw new ApiException("Public admin registration is disabled");
+        }
         if (authMapper.findAdminByEmail(request.email()) != null) {
             throw new ApiException("Email already exists");
         }

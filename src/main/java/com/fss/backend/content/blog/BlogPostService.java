@@ -2,6 +2,7 @@ package com.fss.backend.content.blog;
 
 import com.fss.backend.content.html.HtmlContentImageUsageService;
 import com.fss.backend.content.html.HtmlSanitizerService;
+import com.fss.backend.file.FileReferenceService;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,14 +21,17 @@ public class BlogPostService {
     private final EcommerceSupport support;
     private final HtmlSanitizerService htmlSanitizerService;
     private final HtmlContentImageUsageService htmlContentImageUsageService;
+    private final FileReferenceService fileReferenceService;
 
     public BlogPostService(BlogPostMapper mapper, EcommerceSupport support,
                            HtmlSanitizerService htmlSanitizerService,
-                           HtmlContentImageUsageService htmlContentImageUsageService) {
+                           HtmlContentImageUsageService htmlContentImageUsageService,
+                           FileReferenceService fileReferenceService) {
         this.mapper = mapper;
         this.support = support;
         this.htmlSanitizerService = htmlSanitizerService;
         this.htmlContentImageUsageService = htmlContentImageUsageService;
+        this.fileReferenceService = fileReferenceService;
     }
 
     public List<BlogPost> listPublicPosts(String keyword, int page, int limit) {
@@ -67,7 +71,8 @@ public class BlogPostService {
 
     @Transactional
     public void updatePost(UUID id, BlogPostRequest request) {
-        support.require(mapper.findPostById(id) != null, "Blog post not found");
+        BlogPost existing = mapper.findPostById(id);
+        support.require(existing != null, "Blog post not found");
         support.activateFile(request.coverFileId());
         String status = normalizePostStatusDefault(request.status());
         ContentPayload content = contentPayload(request);
@@ -75,12 +80,17 @@ public class BlogPostService {
                 request.excerpt(), content.legacyJson(), content.html(), request.coverFileId(), status,
                 normalizePublishedAt(status, request.publishedAt()), support.adminId());
         htmlContentImageUsageService.activateImages(content.html());
+        fileReferenceService.releaseFile(existing.coverFileId());
+        fileReferenceService.releaseRemovedHtmlImages(existing.contentHtml(), content.html());
     }
 
     @Transactional
     public void deletePost(UUID id) {
-        support.require(mapper.findPostById(id) != null, "Blog post not found");
+        BlogPost existing = mapper.findPostById(id);
+        support.require(existing != null, "Blog post not found");
         mapper.softDeletePost(id, support.adminId());
+        fileReferenceService.releaseFile(existing.coverFileId());
+        fileReferenceService.releaseRemovedHtmlImages(existing.contentHtml(), null);
     }
 
     private OffsetDateTime normalizePublishedAt(String status, OffsetDateTime publishedAt) {

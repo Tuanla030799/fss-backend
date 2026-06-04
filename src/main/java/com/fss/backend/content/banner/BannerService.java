@@ -1,5 +1,6 @@
 package com.fss.backend.content.banner;
 
+import com.fss.backend.file.FileReferenceService;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,10 +12,12 @@ import java.util.UUID;
 public class BannerService {
     private final BannerMapper mapper;
     private final EcommerceSupport support;
+    private final FileReferenceService fileReferenceService;
 
-    public BannerService(BannerMapper mapper, EcommerceSupport support) {
+    public BannerService(BannerMapper mapper, EcommerceSupport support, FileReferenceService fileReferenceService) {
         this.mapper = mapper;
         this.support = support;
+        this.fileReferenceService = fileReferenceService;
     }
 
     public List<LandingBanner> listPublicBanners() {
@@ -37,17 +40,21 @@ public class BannerService {
 
     @Transactional
     public void updateBanner(UUID id, LandingBannerRequest request) {
-        support.require(mapper.findBannerById(id) != null, "Banner not found");
+        LandingBanner existing = mapper.findBannerById(id);
+        support.require(existing != null, "Banner not found");
         support.activateFile(request.fileId());
         mapper.updateBanner(id, request.title(), request.subtitle(), request.linkUrl(), request.fileId(),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE), support.nz(request.sortOrder()),
                 request.startsAt(), request.endsAt(), support.adminId());
+        fileReferenceService.releaseFile(existing.fileId());
     }
 
     @Transactional
     public void deleteBanner(UUID id) {
-        support.require(mapper.findBannerById(id) != null, "Banner not found");
+        LandingBanner existing = mapper.findBannerById(id);
+        support.require(existing != null, "Banner not found");
         mapper.softDeleteBanner(id, support.adminId());
+        fileReferenceService.releaseFile(existing.fileId());
     }
 
     private LandingBanner withBannerUrl(LandingBanner banner) {

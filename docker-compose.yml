@@ -21,6 +21,7 @@ services:
       SPRING_PROFILES_ACTIVE: docker
       APP_CDN_BASE_URL: ${APP_CDN_BASE_URL:-/files}
       APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      APP_AUTH_ALLOW_PUBLIC_ADMIN_REGISTRATION: ${APP_AUTH_ALLOW_PUBLIC_ADMIN_REGISTRATION:-true}
     depends_on:
       db:
         condition: service_healthy

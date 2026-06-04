@@ -44,6 +44,8 @@ docker compose up --build
 
 Compose tự dùng profile `docker`, mount `./uploads` vào `/app/uploads` và `./logs` vào `/app/logs`.
 
+Deploy production trên Google Cloud VM: xem [docs/deploy-google-cloud-vm.md](docs/deploy-google-cloud-vm.md).
+
 ## Endpoint chính
 - `GET /api/health`
 - `POST /api/admin/auth/register`

@@ -1,5 +1,6 @@
 package com.fss.backend.catalog.brand;
 
+import com.fss.backend.file.FileReferenceService;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,10 +12,12 @@ import java.util.UUID;
 public class BrandService {
     private final BrandMapper mapper;
     private final EcommerceSupport support;
+    private final FileReferenceService fileReferenceService;
 
-    public BrandService(BrandMapper mapper, EcommerceSupport support) {
+    public BrandService(BrandMapper mapper, EcommerceSupport support, FileReferenceService fileReferenceService) {
         this.mapper = mapper;
         this.support = support;
+        this.fileReferenceService = fileReferenceService;
     }
 
     public List<Brand> listPublicBrands(String keyword) {
@@ -50,18 +53,22 @@ public class BrandService {
 
     @Transactional
     public void updateBrand(UUID id, BrandRequest request) {
-        support.require(mapper.findBrandById(id) != null, "Brand not found");
+        Brand existing = mapper.findBrandById(id);
+        support.require(existing != null, "Brand not found");
         support.activateFile(request.fileId());
         mapper.updateBrand(id, request.name().trim(), uniqueSlug(request.slug(), request.name(), id),
                 request.description(), request.fileId(),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
                 support.nz(request.sortOrder()), support.adminId());
+        fileReferenceService.releaseFile(existing.fileId());
     }
 
     @Transactional
     public void deleteBrand(UUID id) {
-        support.require(mapper.findBrandById(id) != null, "Brand not found");
+        Brand existing = mapper.findBrandById(id);
+        support.require(existing != null, "Brand not found");
         mapper.softDeleteBrand(id, support.adminId());
+        fileReferenceService.releaseFile(existing.fileId());
     }
 
     private String uniqueSlug(String slug, String name, UUID exclude) {

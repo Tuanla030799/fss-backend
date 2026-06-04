@@ -7,6 +7,7 @@ import com.fss.backend.catalog.sku.Sku;
 import com.fss.backend.catalog.sku.SkuRequest;
 import com.fss.backend.content.html.HtmlContentImageUsageService;
 import com.fss.backend.content.html.HtmlSanitizerService;
+import com.fss.backend.file.FileReferenceService;
 import com.fss.backend.masterdata.ColorOption;
 import com.fss.backend.masterdata.SizeColorMapper;
 import com.fss.backend.masterdata.SizeOption;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,11 +33,13 @@ public class ProductService {
     private final EcommerceSupport support;
     private final HtmlSanitizerService htmlSanitizerService;
     private final HtmlContentImageUsageService htmlContentImageUsageService;
+    private final FileReferenceService fileReferenceService;
 
     public ProductService(ProductMapper mapper, CategoryMapper categoryMapper, BrandMapper brandMapper,
                           SizeColorMapper sizeColorMapper, EcommerceSupport support,
                           HtmlSanitizerService htmlSanitizerService,
-                          HtmlContentImageUsageService htmlContentImageUsageService) {
+                          HtmlContentImageUsageService htmlContentImageUsageService,
+                          FileReferenceService fileReferenceService) {
         this.mapper = mapper;
         this.categoryMapper = categoryMapper;
         this.brandMapper = brandMapper;
@@ -43,6 +47,7 @@ public class ProductService {
         this.support = support;
         this.htmlSanitizerService = htmlSanitizerService;
         this.htmlContentImageUsageService = htmlContentImageUsageService;
+        this.fileReferenceService = fileReferenceService;
     }
 
     public List<ProductSummary> listPublicProducts(UUID categoryId, String categorySlug, UUID brandId, String brandSlug, String gender, String keyword, String size,
@@ -97,6 +102,9 @@ public class ProductService {
         support.require(mapper.findProductSummaryById(id) != null, "Product not found");
         support.require(categoryMapper.findCategoryById(request.categoryId()) != null, "Category not found");
         requireBrandExists(request.brandId());
+        String previousDescriptionHtml = mapper.findProductDescriptionHtml(id);
+        List<ProductImage> previousImages = mapper.listImages(id);
+        List<ProductVariant> previousVariants = mapper.listVariants(id);
         ContentPayload content = contentPayload(request);
         mapper.updateProduct(id, request.categoryId(), request.brandId(), support.normalizeProductGenderDefault(request.gender()),
                 support.trimRequired(request.name(), "Product name"), uniqueSlug(request.slug(), request.name(), id),
@@ -105,6 +113,9 @@ public class ProductService {
                 support.bool(request.isFeatured()), support.nz(request.featuredOrder()), support.adminId());
         htmlContentImageUsageService.activateImages(content.html());
         replaceProductChildren(id, request.images(), request.variants(), request.skus());
+        fileReferenceService.releaseFiles(fileIds(previousImages));
+        fileReferenceService.releaseFiles(variantImageFileIds(previousVariants));
+        fileReferenceService.releaseRemovedHtmlImages(previousDescriptionHtml, content.html());
     }
 
     @Transactional
@@ -118,7 +129,13 @@ public class ProductService {
     @CacheEvict(value = "featuredProducts", allEntries = true)
     public void deleteProduct(UUID id) {
         support.require(mapper.findProductSummaryById(id) != null, "Product not found");
+        String previousDescriptionHtml = mapper.findProductDescriptionHtml(id);
+        List<ProductImage> previousImages = mapper.listImages(id);
+        List<ProductVariant> previousVariants = mapper.listVariants(id);
         mapper.softDeleteProduct(id, support.adminId());
+        fileReferenceService.releaseFiles(fileIds(previousImages));
+        fileReferenceService.releaseFiles(variantImageFileIds(previousVariants));
+        fileReferenceService.releaseRemovedHtmlImages(previousDescriptionHtml, null);
     }
 
     private ProductDetail productDetail(ProductSummary summary) {
@@ -184,6 +201,7 @@ public class ProductService {
 
     public UUID upsertVariant(UUID productId, VariantRequest variant) {
         support.require(mapper.findProductSummaryById(productId) != null, "Product not found");
+        ProductVariant existing = variant.id() == null ? null : mapper.findVariantById(variant.id(), productId);
         support.activateFile(variant.imageFileId());
         UUID id = variant.id() == null ? UUID.randomUUID() : variant.id();
         String status = support.normalizeStatusDefault(variant.status(), EcommerceSupport.ACTIVE);
@@ -192,16 +210,19 @@ public class ProductService {
             mapper.insertVariant(id, productId, support.trimRequired(variant.name(), "Variant name"),
                     color.id(), variant.imageFileId(), status, support.nz(variant.sortOrder()));
         } else {
-            support.require(mapper.findVariantById(id, productId) != null, "Variant not found");
+            support.require(existing != null, "Variant not found");
             mapper.updateVariant(id, productId, support.trimRequired(variant.name(), "Variant name"),
                     color.id(), variant.imageFileId(), status, support.nz(variant.sortOrder()));
+            fileReferenceService.releaseFile(existing.imageFileId());
         }
         return id;
     }
 
     public void deleteVariant(UUID productId, UUID variantId) {
-        support.require(mapper.findVariantById(variantId, productId) != null, "Variant not found");
+        ProductVariant existing = mapper.findVariantById(variantId, productId);
+        support.require(existing != null, "Variant not found");
         mapper.softDeleteVariant(variantId, productId);
+        fileReferenceService.releaseFile(existing.imageFileId());
     }
 
     public UUID upsertSku(UUID productId, SkuRequest sku, Map<UUID, UUID> clientVariantIds) {
@@ -234,6 +255,14 @@ public class ProductService {
     public void deleteSku(UUID productId, UUID skuId) {
         support.require(mapper.findSkuById(skuId, productId) != null, "SKU not found");
         mapper.softDeleteSku(skuId, productId);
+    }
+
+    private List<UUID> fileIds(Collection<ProductImage> images) {
+        return images.stream().map(ProductImage::fileId).toList();
+    }
+
+    private List<UUID> variantImageFileIds(Collection<ProductVariant> variants) {
+        return variants.stream().map(ProductVariant::imageFileId).toList();
     }
 
     private String uniqueSlug(String slug, String name, UUID exclude) {

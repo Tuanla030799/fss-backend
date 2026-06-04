@@ -9,6 +9,7 @@ public interface FileAssetRepository {
     FileAsset findById(UUID id);
     FileAsset findByPath(String path);
     void updateStatus(UUID id, String status, UUID updatedBy);
+    int countActiveReferences(UUID id, String path);
     List<FileAsset> listInactiveCreatedBefore(OffsetDateTime cutoff);
     void deleteById(UUID id);
 }

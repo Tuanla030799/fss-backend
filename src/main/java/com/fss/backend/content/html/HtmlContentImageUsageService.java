@@ -7,6 +7,8 @@ import org.jsoup.Jsoup;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Service
 public class HtmlContentImageUsageService {
@@ -19,14 +21,21 @@ public class HtmlContentImageUsageService {
     }
 
     public void activateImages(String sanitizedHtml) {
-        if (sanitizedHtml == null || sanitizedHtml.isBlank()) {
-            return;
+        extractFilePaths(sanitizedHtml).forEach(this::activateByPath);
+    }
+
+    public Set<String> extractFilePaths(String html) {
+        if (html == null || html.isBlank()) {
+            return Set.of();
         }
-        Jsoup.parseBodyFragment(sanitizedHtml).select("img[src]").stream()
-                .map(image -> toFilePath(image.attr("src")))
-                .filter(path -> path != null && !path.isBlank())
-                .distinct()
-                .forEach(this::activateByPath);
+        Set<String> paths = new LinkedHashSet<>();
+        Jsoup.parseBodyFragment(html).select("img[src]").forEach(image -> {
+            String path = toFilePath(image.attr("src"));
+            if (path != null && !path.isBlank()) {
+                paths.add(path);
+            }
+        });
+        return paths;
     }
 
     private void activateByPath(String path) {

@@ -1,5 +1,7 @@
 .codex
 .env
+.env.production
+.env.production.local
 tmp/
 dist/
 bin/
