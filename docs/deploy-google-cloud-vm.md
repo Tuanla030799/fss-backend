@@ -39,7 +39,7 @@ Chỉ chạy bước cấp SSL sau khi `http://thepocketshoes.store` đã resolv
 
 ## 3. Cài phần mềm trên VM
 
-SSH vào VM rồi cài Docker và Certbot. Nếu public web đang đi qua `nginx` container ở repo frontend thì không cần `nginx` host.
+SSH vào VM rồi cài Docker và Certbot. Reverse proxy public, TLS và Cloudflare real IP đều được xử lý ở repo frontend.
 
 ### Docker Engine + Compose plugin
 
@@ -147,7 +147,7 @@ docker network inspect thepocketshoes_net
 
 ## 6. Cấp HTTPS ở origin
 
-Nếu repo frontend đang terminate TLS trong `nginx` container thì xử lý certificate ở phía frontend/reverse proxy đó. Backend không cần public `80/443`.
+Certificate origin và cấu hình TLS được xử lý ở `nginx` container public của frontend. Backend không cần public `80/443`.
 
 ## 7. Cấu hình Cloudflare
 
@@ -197,10 +197,8 @@ git pull
 - Google Cloud static IP: https://cloud.google.com/compute/docs/ip-addresses/reserve-static-external-ip-address
 - Google Cloud firewall rules: https://cloud.google.com/firewall/docs/using-firewalls
 - Docker Engine trên Ubuntu: https://docs.docker.com/installation/ubuntulinux/
-- Nginx trên Ubuntu: https://ubuntu.com/server/docs/how-to-install-nginx
 - Certbot instructions: https://certbot.eff.org/instructions
 - Cloudflare Full (strict): https://developers.cloudflare.com/ssl/origin-configuration/ssl-modes/full-strict/
-- Cloudflare original visitor IPs: https://developers.cloudflare.com/support/troubleshooting/restoring-visitor-ips/restoring-original-visitor-ips/
 - Cloudflare cache rules: https://developers.cloudflare.com/cache/how-to/cache-rules/settings/
 - Cloudflare default cache behavior: https://developers.cloudflare.com/cache/get-started/
 - Cloudflare Development Mode: https://developers.cloudflare.com/cache/reference/development-mode/

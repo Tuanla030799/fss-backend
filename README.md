@@ -85,7 +85,7 @@ Project này là baseline mới, đã bỏ toàn bộ phần copy cũ như `pres
 ## Cấu hình quan trọng
 - `spring.datasource.*`: PostgreSQL connection.
 - `spring.flyway.locations=classpath:db/migration`.
-- `mybatis.mapper-locations=classpath*:mappers/*.xml`.
+- `mybatis.mapper-locations=classpath*:mappers/**/*.xml`.
 - `app.upload-dir`: thư mục lưu file upload.
 - `app.cdn.base-url`: base URL public cho file.
 - `app.cors.allowed-origins`: danh sách frontend origin được phép gọi API.
