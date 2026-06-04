@@ -1,6 +1,6 @@
 # Deploy lên Google Cloud VM
 
-Tài liệu này giả định backend sẽ chạy trên một VM Ubuntu của Google Compute Engine, domain public là `thepocketshoes.store`, DNS/proxy đi qua Cloudflare, Nginx chạy trên host và Docker Compose chạy `api` + `postgres`.
+Tài liệu này giả định backend sẽ chạy trên một VM Ubuntu của Google Compute Engine, domain public là `thepocketshoes.store`, DNS/proxy đi qua Cloudflare, và `nginx` container của frontend là reverse proxy public duy nhất. Docker Compose của backend chỉ chạy `api` + `postgres`.
 
 ## 1. Chuẩn bị Google Cloud
 
@@ -39,7 +39,7 @@ Chỉ chạy bước cấp SSL sau khi `http://thepocketshoes.store` đã resolv
 
 ## 3. Cài phần mềm trên VM
 
-SSH vào VM rồi cài Docker, Nginx và Certbot.
+SSH vào VM rồi cài Docker và Certbot. Nếu public web đang đi qua `nginx` container ở repo frontend thì không cần `nginx` host.
 
 ### Docker Engine + Compose plugin
 
@@ -59,20 +59,13 @@ sudo usermod -aG docker "$USER"
 newgrp docker
 ```
 
-### Nginx
-
-```bash
-sudo apt install -y nginx
-sudo systemctl enable --now nginx
-```
-
 ### Certbot
 
 ```bash
 sudo snap install core
 sudo snap refresh core
 sudo snap install --classic certbot
-sudo ln -sf /snap/bin/certbot /usr/bin/certbot
+sudo ln -sf /snap/bin/certbot /usr/local/bin/certbot
 ```
 
 ## 4. Deploy backend
@@ -99,6 +92,7 @@ Các biến bắt buộc cần sửa:
 - `APP_JWT_SECRET`
 - `APP_CORS_ALLOWED_ORIGINS`
 - `APP_CDN_BASE_URL`
+- `BACKEND_PUBLIC_NETWORK`
 
 Khuyến nghị cho domain hiện tại:
 
@@ -106,6 +100,13 @@ Khuyến nghị cho domain hiện tại:
 APP_CDN_BASE_URL=https://thepocketshoes.store/files
 APP_CORS_ALLOWED_ORIGINS=https://thepocketshoes.store,https://www.thepocketshoes.store
 APP_AUTH_ALLOW_PUBLIC_ADMIN_REGISTRATION=false
+BACKEND_PUBLIC_NETWORK=thepocketshoes_net
+```
+
+Tạo Docker network dùng chung với reverse proxy/public nginx của frontend nếu chưa có:
+
+```bash
+docker network create thepocketshoes_net || true
 ```
 
 Chạy deploy:
@@ -119,45 +120,34 @@ docker compose --env-file .env.production -f docker-compose.prod.yml ps
 Kiểm tra API local trên VM:
 
 ```bash
-curl http://127.0.0.1:8080/api/health
+docker compose --env-file .env.production -f docker-compose.prod.yml exec api \
+  sh -lc 'wget -qO- http://127.0.0.1:8080/api/health || curl -fsS http://127.0.0.1:8080/api/health'
 ```
 
-## 5. Cấu hình Nginx cho domain
+## 5. Kết nối với public nginx container
 
-Tạo snippet để Nginx nhận đúng IP thật của visitor từ header `CF-Connecting-IP` do Cloudflare gửi xuống:
+Backend compose production đã được cấu hình sẵn để:
+
+- giữ PostgreSQL trong network nội bộ riêng
+- expose app ở port `8080` chỉ trong Docker network
+- join external network `thepocketshoes_net`
+- gắn alias `backend`
+
+Vì vậy public `nginx` container ở repo frontend chỉ cần proxy:
+
+- `/` -> frontend service
+- `/api/*` -> `http://backend:8080`
+- `/files/*` -> `http://backend:8080`
+
+Xác nhận container backend đã join đúng network:
 
 ```bash
-sudo mkdir -p /etc/nginx/snippets
-chmod +x scripts/generate-cloudflare-realip.sh
-./scripts/generate-cloudflare-realip.sh /tmp/cloudflare-realip.conf
-sudo cp /tmp/cloudflare-realip.conf /etc/nginx/snippets/cloudflare-realip.conf
+docker network inspect thepocketshoes_net
 ```
-
-Copy file config có sẵn trong repo:
-
-```bash
-sudo cp deploy/nginx/thepocketshoes.store.conf /etc/nginx/sites-available/thepocketshoes.store.conf
-sudo ln -sf /etc/nginx/sites-available/thepocketshoes.store.conf /etc/nginx/sites-enabled/thepocketshoes.store.conf
-sudo rm -f /etc/nginx/sites-enabled/default
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-Lúc này `http://thepocketshoes.store/` sẽ redirect sang `/api/health`, còn các request `/api/*` và `/files/*` sẽ đi qua backend ở `127.0.0.1:8080`.
 
 ## 6. Cấp HTTPS ở origin
 
-Sau khi HTTP hoạt động bình thường:
-
-```bash
-sudo certbot --nginx -d thepocketshoes.store -d www.thepocketshoes.store
-```
-
-Kiểm tra lại:
-
-```bash
-curl -I https://thepocketshoes.store/api/health
-```
+Nếu repo frontend đang terminate TLS trong `nginx` container thì xử lý certificate ở phía frontend/reverse proxy đó. Backend không cần public `80/443`.
 
 ## 7. Cấu hình Cloudflare
 
@@ -196,11 +186,11 @@ git pull
 
 ## 9. Lưu ý vận hành
 
-- `docker-compose.prod.yml` chỉ bind backend vào `127.0.0.1:8080`, không public trực tiếp cổng app hay database ra internet.
+- `docker-compose.prod.yml` không publish backend ra host port. App chỉ `expose 8080` trong Docker network chung với reverse proxy.
+- Service backend dùng network alias `backend` trên `thepocketshoes_net`. Nếu frontend reverse proxy đang trỏ sang tên khác, phải thống nhất lại.
 - `POST /api/admin/auth/register` đã được khóa trong profile `docker` trừ khi bạn chủ động đặt `APP_AUTH_ALLOW_PUBLIC_ADMIN_REGISTRATION=true`.
 - Nếu cần tạo admin đầu tiên bằng API, chỉ bật `APP_AUTH_ALLOW_PUBLIC_ADMIN_REGISTRATION=true` tạm thời, tạo xong thì tắt lại và redeploy ngay.
 - Migration `V2__seed_admin.sql` có seed sẵn một admin record. Trước khi dùng production, hãy kiểm tra và thay thế account đó theo quy trình nội bộ của bạn.
-- Nếu dùng log, rate-limit hoặc firewall theo IP ở Nginx, bắt buộc giữ file `/etc/nginx/snippets/cloudflare-realip.conf` được cập nhật theo IP ranges chính thức của Cloudflare.
 
 ## Tài liệu tham khảo
 

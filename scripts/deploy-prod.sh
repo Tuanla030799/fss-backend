@@ -10,7 +10,14 @@ if [[ ! -f "${ENV_FILE}" ]]; then
     exit 1
 fi
 
+PUBLIC_NETWORK="$(grep -E '^BACKEND_PUBLIC_NETWORK=' "${ENV_FILE}" | tail -n 1 | cut -d '=' -f 2-)"
+PUBLIC_NETWORK="${PUBLIC_NETWORK:-thepocketshoes_net}"
+
 mkdir -p "${ROOT_DIR}/uploads" "${ROOT_DIR}/logs"
+
+if ! docker network inspect "${PUBLIC_NETWORK}" >/dev/null 2>&1; then
+    docker network create "${PUBLIC_NETWORK}"
+fi
 
 docker compose \
     --env-file "${ENV_FILE}" \

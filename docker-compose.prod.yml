@@ -17,7 +17,7 @@ services:
       timeout: 5s
       retries: 10
     networks:
-      - fss
+      - fss_internal
 
   api:
     build: .
@@ -41,16 +41,22 @@ services:
       APP_AUTH_ALLOW_PUBLIC_ADMIN_REGISTRATION: ${APP_AUTH_ALLOW_PUBLIC_ADMIN_REGISTRATION:-false}
       LOGGING_FILE_PATH: ${LOGGING_FILE_PATH:-/app/logs}
       TZ: ${TZ:-Asia/Ho_Chi_Minh}
-    ports:
-      - "127.0.0.1:8080:8080"
+    expose:
+      - "8080"
     volumes:
       - ./uploads:/app/uploads
       - ./logs:/app/logs
     networks:
-      - fss
+      fss_internal:
+      public_proxy:
+        aliases:
+          - backend
 
 volumes:
   postgres_data:
 
 networks:
-  fss:
+  fss_internal:
+  public_proxy:
+    name: ${BACKEND_PUBLIC_NETWORK:-thepocketshoes_net}
+    external: true
