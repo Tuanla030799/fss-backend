@@ -18,10 +18,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -50,18 +52,21 @@ public class ProductService {
         this.fileReferenceService = fileReferenceService;
     }
 
-    public List<ProductSummary> listPublicProducts(UUID categoryId, String categorySlug, UUID brandId, String brandSlug, String gender, String keyword, String size,
-                                                   String color, BigDecimal minPrice, BigDecimal maxPrice,
+    public List<ProductSummary> listPublicProducts(List<UUID> categoryIds, String categorySlug, List<UUID> brandIds, String brandSlug, List<String> genders, String keyword, List<String> sizes,
+                                                   List<String> colors, BigDecimal minPrice, BigDecimal maxPrice,
                                                    int page, int limit) {
-        return mapper.listProducts(true, null, categoryId, categorySlug, brandId, brandSlug, support.normalizeProductGenderNullable(gender),
-                support.trimToNull(keyword), support.trimToNull(size), support.trimToNull(color), minPrice, maxPrice,
+        return mapper.listProducts(true, null, normalizeUuidFilters(categoryIds), categorySlug, normalizeUuidFilters(brandIds), brandSlug,
+                normalizeGenderFilters(genders), support.trimToNull(keyword), normalizeTextFilters(sizes), normalizeTextFilters(colors), minPrice, maxPrice,
                 false, support.safeLimit(limit), support.offset(page, limit)).stream().map(this::withProductUrl).toList();
     }
 
     public List<ProductSummary> listAdminProducts(String status, UUID categoryId, UUID brandId, String gender, String size, String color, String keyword, int page, int limit) {
-        return mapper.listProducts(false, support.normalizeProductStatusNullable(status), categoryId, null, brandId, null,
-                support.normalizeProductGenderNullable(gender), support.trimToNull(keyword),
-                support.trimToNull(size), support.trimToNull(color), null, null, false, support.safeLimit(limit), support.offset(page, limit))
+        return mapper.listProducts(false, support.normalizeProductStatusNullable(status),
+                normalizeUuidFilters(categoryId == null ? null : List.of(categoryId)), null,
+                normalizeUuidFilters(brandId == null ? null : List.of(brandId)), null,
+                normalizeGenderFilters(gender == null ? null : List.of(gender)), support.trimToNull(keyword),
+                normalizeTextFilters(size == null ? null : List.of(size)), normalizeTextFilters(color == null ? null : List.of(color)),
+                null, null, false, support.safeLimit(limit), support.offset(page, limit))
                 .stream().map(this::withProductUrl).toList();
     }
 
@@ -255,6 +260,33 @@ public class ProductService {
     public void deleteSku(UUID productId, UUID skuId) {
         support.require(mapper.findSkuById(skuId, productId) != null, "SKU not found");
         mapper.softDeleteSku(skuId, productId);
+    }
+
+    private List<UUID> normalizeUuidFilters(List<UUID> values) {
+        if (values == null) return List.of();
+        return values.stream().filter(Objects::nonNull).distinct().toList();
+    }
+
+    private List<String> normalizeGenderFilters(List<String> values) {
+        if (values == null) return List.of();
+        return values.stream()
+                .filter(Objects::nonNull)
+                .flatMap(value -> Arrays.stream(value.split(",")))
+                .map(support::normalizeProductGenderNullable)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+    }
+
+    private List<String> normalizeTextFilters(List<String> values) {
+        if (values == null) return List.of();
+        return values.stream()
+                .filter(Objects::nonNull)
+                .flatMap(value -> Arrays.stream(value.split(",")))
+                .map(support::trimToNull)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
     }
 
     private List<UUID> fileIds(Collection<ProductImage> images) {

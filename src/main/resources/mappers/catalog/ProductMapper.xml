@@ -23,15 +23,43 @@
             p.deleted_at IS NULL
             <if test="publicOnly">AND p.status = 'ACTIVE' AND c.status = 'ACTIVE' AND c.deleted_at IS NULL AND (b.id IS NULL OR (b.status = 'ACTIVE' AND b.deleted_at IS NULL))</if>
             <if test="status != null and status != ''">AND p.status = #{status}</if>
-            <if test="categoryId != null">AND p.category_id = #{categoryId}</if>
+            <if test="categoryIds != null and categoryIds.size() > 0">
+                AND p.category_id IN <foreach collection="categoryIds" item="categoryId" open="(" separator="," close=")">#{categoryId}</foreach>
+            </if>
             <if test="categorySlug != null and categorySlug != ''">AND c.slug = #{categorySlug}</if>
-            <if test="brandId != null">AND p.brand_id = #{brandId}</if>
+            <if test="brandIds != null and brandIds.size() > 0">
+                AND p.brand_id IN <foreach collection="brandIds" item="brandId" open="(" separator="," close=")">#{brandId}</foreach>
+            </if>
             <if test="brandSlug != null and brandSlug != ''">AND b.slug = #{brandSlug}</if>
-            <if test="gender != null and gender != ''">AND p.gender = #{gender}</if>
+            <if test="genders != null and genders.size() > 0">
+                AND p.gender IN <foreach collection="genders" item="gender" open="(" separator="," close=")">#{gender}</foreach>
+            </if>
             <if test="keyword != null and keyword != ''">AND (p.name ILIKE CONCAT('%', #{keyword}, '%') OR p.short_description ILIKE CONCAT('%', #{keyword}, '%'))</if>
             <if test="featuredOnly">AND p.is_featured = true</if>
-            <if test="size != null and size != ''">AND EXISTS (SELECT 1 FROM skus sx JOIN sizes sz ON sz.id = sx.size_id WHERE sx.product_id=p.id AND sx.deleted_at IS NULL AND sz.value=#{size})</if>
-            <if test="color != null and color != ''">AND EXISTS (SELECT 1 FROM product_variants vx JOIN colors cx ON cx.id = vx.color_id WHERE vx.product_id=p.id AND vx.deleted_at IS NULL AND (cx.name ILIKE CONCAT('%', #{color}, '%') OR cx.color_code ILIKE CONCAT('%', #{color}, '%') OR vx.name ILIKE CONCAT('%', #{color}, '%')))</if>
+            <if test="sizes != null and sizes.size() > 0">
+                AND EXISTS (
+                    SELECT 1
+                    FROM skus sx
+                    JOIN sizes sz ON sz.id = sx.size_id
+                    WHERE sx.product_id = p.id
+                      AND sx.deleted_at IS NULL
+                      AND sz.value IN <foreach collection="sizes" item="size" open="(" separator="," close=")">#{size}</foreach>
+                )
+            </if>
+            <if test="colors != null and colors.size() > 0">
+                AND EXISTS (
+                    SELECT 1
+                    FROM product_variants vx
+                    JOIN colors cx ON cx.id = vx.color_id
+                    WHERE vx.product_id = p.id
+                      AND vx.deleted_at IS NULL
+                      AND (
+                        <foreach collection="colors" item="color" separator=" OR ">
+                            (cx.name ILIKE CONCAT('%', #{color}, '%') OR cx.color_code ILIKE CONCAT('%', #{color}, '%') OR vx.name ILIKE CONCAT('%', #{color}, '%'))
+                        </foreach>
+                      )
+                )
+            </if>
             <if test="minPrice != null">AND EXISTS (SELECT 1 FROM skus sp WHERE sp.product_id=p.id AND sp.deleted_at IS NULL AND COALESCE(sp.sale_price, sp.price) &gt;= #{minPrice})</if>
             <if test="maxPrice != null">AND EXISTS (SELECT 1 FROM skus sp WHERE sp.product_id=p.id AND sp.deleted_at IS NULL AND COALESCE(sp.sale_price, sp.price) &lt;= #{maxPrice})</if>
         </where>

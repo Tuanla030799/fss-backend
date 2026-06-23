@@ -12,11 +12,11 @@ import java.util.UUID;
 @Mapper
 public interface ProductMapper {
     List<ProductSummary> listProducts(@Param("publicOnly") boolean publicOnly, @Param("status") String status,
-                                      @Param("categoryId") UUID categoryId, @Param("categorySlug") String categorySlug,
-                                      @Param("brandId") UUID brandId, @Param("brandSlug") String brandSlug,
-                                      @Param("gender") String gender,
-                                      @Param("keyword") String keyword, @Param("size") String size,
-                                      @Param("color") String color, @Param("minPrice") BigDecimal minPrice,
+                                      @Param("categoryIds") List<UUID> categoryIds, @Param("categorySlug") String categorySlug,
+                                      @Param("brandIds") List<UUID> brandIds, @Param("brandSlug") String brandSlug,
+                                      @Param("genders") List<String> genders,
+                                      @Param("keyword") String keyword, @Param("sizes") List<String> sizes,
+                                      @Param("colors") List<String> colors, @Param("minPrice") BigDecimal minPrice,
                                       @Param("maxPrice") BigDecimal maxPrice, @Param("featuredOnly") boolean featuredOnly,
                                       @Param("limit") int limit, @Param("offset") int offset);
     ProductSummary findProductSummaryById(@Param("id") UUID id);

@@ -23,19 +23,19 @@ public class ProductController {
     }
 
     @GetMapping("/products")
-    public ApiResponse<List<ProductSummary>> publicProducts(@RequestParam(required = false) UUID categoryId,
+    public ApiResponse<List<ProductSummary>> publicProducts(@RequestParam(name = "categoryId", required = false) List<UUID> categoryIds,
                                                             @RequestParam(required = false) String categorySlug,
-                                                            @RequestParam(required = false) UUID brandId,
+                                                            @RequestParam(name = "brandId", required = false) List<UUID> brandIds,
                                                             @RequestParam(required = false) String brandSlug,
-                                                            @RequestParam(required = false) String gender,
+                                                            @RequestParam(required = false) List<String> gender,
                                                             @RequestParam(required = false) String keyword,
-                                                            @RequestParam(required = false) String size,
-                                                            @RequestParam(required = false) String color,
+                                                            @RequestParam(required = false) List<String> size,
+                                                            @RequestParam(required = false) List<String> color,
                                                             @RequestParam(required = false) BigDecimal minPrice,
                                                             @RequestParam(required = false) BigDecimal maxPrice,
                                                             @RequestParam(defaultValue = "1") @Min(1) int page,
                                                             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
-        return ApiResponse.ok("OK", service.listPublicProducts(categoryId, categorySlug, brandId, brandSlug, gender, keyword, size, color, minPrice, maxPrice, page, limit));
+        return ApiResponse.ok("OK", service.listPublicProducts(categoryIds, categorySlug, brandIds, brandSlug, gender, keyword, size, color, minPrice, maxPrice, page, limit));
     }
 
     @GetMapping("/products/featured")
