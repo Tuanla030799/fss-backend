@@ -18,6 +18,8 @@ services:
       retries: 10
     networks:
       - fss_internal
+    ports:
+      - "5432:5432"
 
   api:
     build: .
