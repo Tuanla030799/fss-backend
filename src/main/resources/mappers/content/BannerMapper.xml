@@ -1,11 +1,19 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.fss.backend.content.banner.BannerMapper">
+    <sql id="bannerWhere">
+        <where>b.deleted_at IS NULL <if test="publicOnly">AND b.status='ACTIVE' AND (b.starts_at IS NULL OR b.starts_at &lt;= now()) AND (b.ends_at IS NULL OR b.ends_at &gt;= now())</if><if test="status != null and status != ''">AND b.status=#{status}</if></where>
+    </sql>
     <select id="listBanners" resultType="com.fss.backend.content.banner.LandingBanner">
         SELECT b.id,b.title,b.subtitle,b.link_url,b.file_id,f.path AS image_url,b.status,b.sort_order,b.starts_at,b.ends_at,b.created_at
         FROM landing_banners b LEFT JOIN files f ON f.id=b.file_id
-        <where>b.deleted_at IS NULL <if test="publicOnly">AND b.status='ACTIVE' AND (b.starts_at IS NULL OR b.starts_at &lt;= now()) AND (b.ends_at IS NULL OR b.ends_at &gt;= now())</if><if test="status != null and status != ''">AND b.status=#{status}</if></where>
+        <include refid="bannerWhere" />
         ORDER BY b.sort_order ASC, b.created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <select id="countBanners" resultType="long">
+        SELECT COUNT(*) FROM landing_banners b
+        <include refid="bannerWhere" />
     </select>
     <select id="findBannerById" resultType="com.fss.backend.content.banner.LandingBanner">
         SELECT b.id,b.title,b.subtitle,b.link_url,b.file_id,f.path AS image_url,b.status,b.sort_order,b.starts_at,b.ends_at,b.created_at FROM landing_banners b LEFT JOIN files f ON f.id=b.file_id WHERE b.id=#{id} AND b.deleted_at IS NULL

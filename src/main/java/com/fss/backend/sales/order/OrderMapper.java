@@ -26,6 +26,7 @@ public interface OrderMapper {
                          @Param("unitPrice") BigDecimal unitPrice, @Param("quantity") Integer quantity,
                          @Param("lineTotal") BigDecimal lineTotal);
     List<Order> listOrders(@Param("status") String status, @Param("keyword") String keyword, @Param("limit") int limit, @Param("offset") int offset);
+    long countOrders(@Param("status") String status, @Param("keyword") String keyword);
     Order findOrderById(@Param("id") UUID id);
     List<OrderItem> listOrderItems(@Param("orderId") UUID orderId);
     void updateOrderStatus(@Param("id") UUID id, @Param("status") String status);
@@ -34,4 +35,3 @@ public interface OrderMapper {
     void insertStatusHistory(@Param("id") UUID id, @Param("orderId") UUID orderId, @Param("oldStatus") String oldStatus, @Param("newStatus") String newStatus, @Param("note") String note, @Param("createdBy") UUID createdBy);
     List<OrderStatusHistory> listStatusHistory(@Param("orderId") UUID orderId);
 }
-

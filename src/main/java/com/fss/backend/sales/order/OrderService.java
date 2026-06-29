@@ -3,6 +3,7 @@ package com.fss.backend.sales.order;
 import com.fss.backend.promotion.coupon.Coupon;
 import com.fss.backend.promotion.coupon.CouponService;
 import com.fss.backend.catalog.sku.SkuForOrder;
+import com.fss.backend.common.PageResult;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,8 +69,11 @@ public class OrderService {
         return getOrder(orderId);
     }
 
-    public List<Order> listOrders(String status, String keyword, int page, int limit) {
-        return mapper.listOrders(support.normalizeOrderStatusNullable(status), keyword, support.safeLimit(limit), support.offset(page, limit));
+    public PageResult<Order> listOrders(String status, String keyword, int page, int limit) {
+        String normalizedStatus = support.normalizeOrderStatusNullable(status);
+        int safeLimit = support.safeLimit(limit);
+        List<Order> items = mapper.listOrders(normalizedStatus, keyword, safeLimit, support.offset(page, safeLimit));
+        return support.pageResult(items, page, safeLimit, mapper.countOrders(normalizedStatus, keyword));
     }
 
     public OrderDetail getOrder(UUID id) {
@@ -123,4 +127,3 @@ public class OrderService {
         return normalized;
     }
 }
-

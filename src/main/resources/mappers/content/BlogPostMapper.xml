@@ -5,19 +5,27 @@
         p.id, p.title, p.slug, p.excerpt, p.content_json::text AS content_json, p.content_html, p.cover_file_id,
         f.path AS cover_image_url, p.status, p.published_at, p.created_at
     </sql>
-
-    <select id="listPosts" resultType="com.fss.backend.content.blog.BlogPost">
-        SELECT <include refid="postSelect" />
-        FROM blog_posts p
-        LEFT JOIN files f ON f.id = p.cover_file_id
+    <sql id="postWhere">
         <where>
             p.deleted_at IS NULL
             <if test="publicOnly">AND p.status = 'ACTIVE' AND (p.published_at IS NULL OR p.published_at &lt;= now())</if>
             <if test="status != null and status != ''">AND p.status = #{status}</if>
             <if test="keyword != null and keyword != ''">AND (p.title ILIKE CONCAT('%', #{keyword}, '%') OR p.excerpt ILIKE CONCAT('%', #{keyword}, '%'))</if>
         </where>
+    </sql>
+
+    <select id="listPosts" resultType="com.fss.backend.content.blog.BlogPost">
+        SELECT <include refid="postSelect" />
+        FROM blog_posts p
+        LEFT JOIN files f ON f.id = p.cover_file_id
+        <include refid="postWhere" />
         ORDER BY p.published_at DESC NULLS LAST, p.created_at DESC
         LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <select id="countPosts" resultType="long">
+        SELECT COUNT(*)
+        FROM blog_posts p
+        <include refid="postWhere" />
     </select>
 
     <select id="findPostById" resultType="com.fss.backend.content.blog.BlogPost">

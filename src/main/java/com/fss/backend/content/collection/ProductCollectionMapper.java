@@ -14,6 +14,9 @@ public interface ProductCollectionMapper {
                                             @Param("keyword") String keyword,
                                             @Param("limit") int limit,
                                             @Param("offset") int offset);
+    long countCollections(@Param("publicOnly") boolean publicOnly,
+                          @Param("status") String status,
+                          @Param("keyword") String keyword);
 
     ProductCollection findCollectionById(@Param("id") UUID id);
 
@@ -42,4 +45,6 @@ public interface ProductCollectionMapper {
                                                 @Param("publicOnly") boolean publicOnly,
                                                 @Param("limit") int limit,
                                                 @Param("offset") int offset);
+    long countCollectionProducts(@Param("collectionId") UUID collectionId,
+                                 @Param("publicOnly") boolean publicOnly);
 }

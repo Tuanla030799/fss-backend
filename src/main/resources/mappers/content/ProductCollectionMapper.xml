@@ -7,7 +7,7 @@
     </sql>
 
     <sql id="productSummarySelect">
-        p.id, p.category_id, cat.name AS category_name, p.brand_id, b.name AS brand_name, b.slug AS brand_slug, p.gender,
+        p.id, p.category_id, cat.name AS category_name, p.brand_id, b.name AS brand_name, b.slug AS brand_slug, bfs.path AS brand_size_guide_url, p.gender,
         p.name, p.slug, p.short_description, p.status, p.is_featured,
         p.featured_order, MIN(s.price) AS min_price, MIN(COALESCE(s.sale_price, s.price)) AS min_sale_price,
         COALESCE(SUM(s.stock), 0)::int AS total_stock,
@@ -15,21 +15,34 @@
         (ARRAY_AGG(f.path ORDER BY pi.is_primary DESC, pi.sort_order ASC) FILTER (WHERE f.path IS NOT NULL))[1] AS primary_image_url,
         p.created_at
     </sql>
-
-    <select id="listCollections" resultType="com.fss.backend.content.collection.ProductCollection">
-        SELECT <include refid="collectionSelect" />
-        FROM collections c
-        LEFT JOIN files f ON f.id = c.file_id
-        LEFT JOIN collection_products cp ON cp.collection_id = c.id
+    <sql id="collectionWhere">
         <where>
             c.deleted_at IS NULL
             <if test="publicOnly">AND c.status = 'ACTIVE'</if>
             <if test="status != null and status != ''">AND c.status = #{status}</if>
             <if test="keyword != null and keyword != ''">AND (c.name ILIKE CONCAT('%', #{keyword}, '%') OR c.excerpt ILIKE CONCAT('%', #{keyword}, '%') OR c.description_html ILIKE CONCAT('%', #{keyword}, '%'))</if>
         </where>
+    </sql>
+    <sql id="collectionProductWhere">
+        WHERE cp.collection_id = #{collectionId}
+          AND p.deleted_at IS NULL
+          <if test="publicOnly">AND p.status = 'ACTIVE' AND cat.status = 'ACTIVE' AND cat.deleted_at IS NULL AND (b.id IS NULL OR (b.status = 'ACTIVE' AND b.deleted_at IS NULL))</if>
+    </sql>
+
+    <select id="listCollections" resultType="com.fss.backend.content.collection.ProductCollection">
+        SELECT <include refid="collectionSelect" />
+        FROM collections c
+        LEFT JOIN files f ON f.id = c.file_id
+        LEFT JOIN collection_products cp ON cp.collection_id = c.id
+        <include refid="collectionWhere" />
         GROUP BY c.id, f.path
         ORDER BY c.sort_order ASC, c.created_at DESC
         LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <select id="countCollections" resultType="long">
+        SELECT COUNT(*)
+        FROM collections c
+        <include refid="collectionWhere" />
     </select>
 
     <select id="findCollectionById" resultType="com.fss.backend.content.collection.ProductCollection">
@@ -86,14 +99,21 @@
         JOIN products p ON p.id = cp.product_id
         JOIN categories cat ON cat.id = p.category_id
         LEFT JOIN brands b ON b.id = p.brand_id
+        LEFT JOIN files bfs ON bfs.id = b.file_size_id
         LEFT JOIN skus s ON s.product_id = p.id AND s.deleted_at IS NULL
         LEFT JOIN product_images pi ON pi.product_id = p.id
         LEFT JOIN files f ON f.id = pi.file_id
-        WHERE cp.collection_id = #{collectionId}
-          AND p.deleted_at IS NULL
-          <if test="publicOnly">AND p.status = 'ACTIVE' AND cat.status = 'ACTIVE' AND cat.deleted_at IS NULL AND (b.id IS NULL OR (b.status = 'ACTIVE' AND b.deleted_at IS NULL))</if>
-        GROUP BY p.id, cat.name, b.name, b.slug, cp.sort_order
+        <include refid="collectionProductWhere" />
+        GROUP BY p.id, cat.name, b.name, b.slug, bfs.path, cp.sort_order
         ORDER BY cp.sort_order ASC, p.created_at DESC
         LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <select id="countCollectionProducts" resultType="long">
+        SELECT COUNT(*)
+        FROM collection_products cp
+        JOIN products p ON p.id = cp.product_id
+        JOIN categories cat ON cat.id = p.category_id
+        LEFT JOIN brands b ON b.id = p.brand_id
+        <include refid="collectionProductWhere" />
     </select>
 </mapper>

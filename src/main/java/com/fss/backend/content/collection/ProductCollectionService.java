@@ -2,6 +2,7 @@ package com.fss.backend.content.collection;
 
 import com.fss.backend.catalog.product.ProductMapper;
 import com.fss.backend.catalog.product.ProductSummary;
+import com.fss.backend.common.PageResult;
 import com.fss.backend.content.html.HtmlContentImageUsageService;
 import com.fss.backend.content.html.HtmlSanitizerService;
 import com.fss.backend.file.FileReferenceService;
@@ -33,18 +34,23 @@ public class ProductCollectionService {
         this.fileReferenceService = fileReferenceService;
     }
 
-    public List<ProductCollection> listPublicCollections(String keyword, int page, int limit) {
-        return mapper.listCollections(true, null, keyword, support.safeLimit(limit), support.offset(page, limit))
+    public PageResult<ProductCollection> listPublicCollections(String keyword, int page, int limit) {
+        int safeLimit = support.safeLimit(limit);
+        List<ProductCollection> items = mapper.listCollections(true, null, keyword, safeLimit, support.offset(page, safeLimit))
                 .stream().map(this::withCollectionUrl).toList();
+        return support.pageResult(items, page, safeLimit, mapper.countCollections(true, null, keyword));
     }
 
     public ProductCollectionDetail getPublicCollection(String slug, int page, int limit) {
         return collectionDetail(mapper.findCollectionBySlug(slug, true), true, page, limit);
     }
 
-    public List<ProductCollection> listAdminCollections(String status, String keyword, int page, int limit) {
-        return mapper.listCollections(false, support.normalizeStatusNullable(status), keyword, support.safeLimit(limit), support.offset(page, limit))
+    public PageResult<ProductCollection> listAdminCollections(String status, String keyword, int page, int limit) {
+        String normalizedStatus = support.normalizeStatusNullable(status);
+        int safeLimit = support.safeLimit(limit);
+        List<ProductCollection> items = mapper.listCollections(false, normalizedStatus, keyword, safeLimit, support.offset(page, safeLimit))
                 .stream().map(this::withCollectionUrl).toList();
+        return support.pageResult(items, page, safeLimit, mapper.countCollections(false, normalizedStatus, keyword));
     }
 
     public ProductCollectionDetail getAdminCollection(UUID id) {
@@ -95,12 +101,15 @@ public class ProductCollectionService {
     private ProductCollectionDetail collectionDetail(ProductCollection collection, boolean publicOnly, int page, int limit) {
         support.require(collection != null, "Collection not found");
         ProductCollection normalized = withCollectionUrl(collection);
-        List<ProductSummary> products = mapper.listCollectionProducts(collection.id(), publicOnly, support.safeLimit(limit), support.offset(page, limit))
+        int safeLimit = support.safeLimit(limit);
+        List<ProductSummary> products = mapper.listCollectionProducts(collection.id(), publicOnly, safeLimit, support.offset(page, safeLimit))
                 .stream().map(this::withProductUrl).toList();
+        PageResult<ProductSummary> pagedProducts = support.pageResult(products, page, safeLimit,
+                mapper.countCollectionProducts(collection.id(), publicOnly));
         return new ProductCollectionDetail(normalized.id(), normalized.name(), normalized.slug(),
                 normalized.excerpt(), normalized.descriptionHtml(),
                 normalized.fileId(), normalized.imageUrl(), normalized.status(),
-                normalized.sortOrder(), normalized.productCount(), normalized.createdAt(), products);
+                normalized.sortOrder(), normalized.productCount(), normalized.createdAt(), pagedProducts);
     }
 
     private String collectionExcerpt(ProductCollectionRequest request) {
@@ -134,8 +143,8 @@ public class ProductCollectionService {
     }
 
     private ProductSummary withProductUrl(ProductSummary product) {
-        return product == null || product.primaryImageUrl() == null ? product : new ProductSummary(product.id(), product.categoryId(),
-                product.categoryName(), product.brandId(), product.brandName(), product.brandSlug(), product.brandSizeGuideUrl(), product.gender(), product.name(), product.slug(), product.shortDescription(), product.status(),
+        return product == null ? null : new ProductSummary(product.id(), product.categoryId(),
+                product.categoryName(), product.brandId(), product.brandName(), product.brandSlug(), support.publicUrl(product.brandSizeGuideUrl()), product.gender(), product.name(), product.slug(), product.shortDescription(), product.status(),
                 product.isFeatured(), product.featuredOrder(), product.minPrice(), product.minSalePrice(), product.totalStock(),
                 product.primaryFileId(), support.publicUrl(product.primaryImageUrl()), product.createdAt());
     }

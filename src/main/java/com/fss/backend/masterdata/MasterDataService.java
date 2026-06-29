@@ -37,14 +37,14 @@ public class MasterDataService {
     private MasterDataResponse masterData(boolean publicOnly) {
         String status = publicOnly ? EcommerceSupport.ACTIVE : null;
         return new MasterDataResponse(
-                categoryMapper.listCategories(status, null).stream().map(this::categoryOption).toList(),
-                brandMapper.listBrands(status, null).stream().map(this::brandOption).toList(),
+                categoryMapper.listCategories(status, null, 1000, 0).stream().map(this::categoryOption).toList(),
+                brandMapper.listBrands(status, null, 1000, 0).stream().map(this::brandOption).toList(),
                 collectionMapper.listCollections(publicOnly, status, null, 1000, 0).stream().map(this::collectionOption).toList(),
                 List.of(new StaticOption("MALE", "Nam"), new StaticOption("FEMALE", "Nữ"), new StaticOption("UNISEX", "Unisex")),
                 List.of(new StaticOption("DRAFT", "Nháp"), new StaticOption("ACTIVE", "Hoạt động"), new StaticOption("INACTIVE", "Ẩn")),
                 List.of(new StaticOption("ACTIVE", "Hoạt động"), new StaticOption("INACTIVE", "Ẩn")),
-                sizeColorMapper.listSizes(status, null),
-                sizeColorMapper.listColors(status, null)
+                sizeColorMapper.listSizes(status, null, 1000, 0),
+                sizeColorMapper.listColors(status, null, 1000, 0)
         );
     }
 

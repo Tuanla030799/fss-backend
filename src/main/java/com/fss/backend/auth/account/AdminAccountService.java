@@ -1,5 +1,6 @@
 package com.fss.backend.auth.account;
 
+import com.fss.backend.common.PageResult;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,8 +21,10 @@ public class AdminAccountService {
         this.support = support;
     }
 
-    public List<AdminAccount> listAdminAccounts(String keyword, int page, int limit) {
-        return mapper.listAdminAccounts(keyword, support.safeLimit(limit), support.offset(page, limit));
+    public PageResult<AdminAccount> listAdminAccounts(String keyword, int page, int limit) {
+        int safeLimit = support.safeLimit(limit);
+        List<AdminAccount> items = mapper.listAdminAccounts(keyword, safeLimit, support.offset(page, safeLimit));
+        return support.pageResult(items, page, safeLimit, mapper.countAdminAccounts(keyword));
     }
 
     @Transactional

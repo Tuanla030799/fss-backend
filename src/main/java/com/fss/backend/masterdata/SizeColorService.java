@@ -1,5 +1,6 @@
 package com.fss.backend.masterdata;
 
+import com.fss.backend.common.PageResult;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,8 +18,12 @@ public class SizeColorService {
         this.support = support;
     }
 
-    public List<SizeOption> listSizes(String status, String keyword) {
-        return mapper.listSizes(support.normalizeStatusNullable(status), support.trimToNull(keyword));
+    public PageResult<SizeOption> listSizes(String status, String keyword, int page, int limit) {
+        String normalizedStatus = support.normalizeStatusNullable(status);
+        String normalizedKeyword = support.trimToNull(keyword);
+        int safeLimit = support.safeLimit(limit);
+        List<SizeOption> items = mapper.listSizes(normalizedStatus, normalizedKeyword, safeLimit, support.offset(page, safeLimit));
+        return support.pageResult(items, page, safeLimit, mapper.countSizes(normalizedStatus, normalizedKeyword));
     }
 
     public SizeOption getSize(UUID id) {
@@ -54,8 +59,12 @@ public class SizeColorService {
         mapper.softDeleteSize(id, support.adminId());
     }
 
-    public List<ColorOption> listColors(String status, String keyword) {
-        return mapper.listColors(support.normalizeStatusNullable(status), support.trimToNull(keyword));
+    public PageResult<ColorOption> listColors(String status, String keyword, int page, int limit) {
+        String normalizedStatus = support.normalizeStatusNullable(status);
+        String normalizedKeyword = support.trimToNull(keyword);
+        int safeLimit = support.safeLimit(limit);
+        List<ColorOption> items = mapper.listColors(normalizedStatus, normalizedKeyword, safeLimit, support.offset(page, safeLimit));
+        return support.pageResult(items, page, safeLimit, mapper.countColors(normalizedStatus, normalizedKeyword));
     }
 
     public ColorOption getColor(UUID id) {

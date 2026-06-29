@@ -3,6 +3,7 @@ package com.fss.backend.shared.ecommerce;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fss.backend.auth.CurrentAdmin;
 import com.fss.backend.common.ApiException;
+import com.fss.backend.common.PageResult;
 import com.fss.backend.file.FileAssetRepository;
 import com.fss.backend.file.FileUrlService;
 import org.springframework.stereotype.Component;
@@ -123,6 +124,10 @@ public class EcommerceSupport {
 
     public int offset(int page, int limit) {
         return (Math.max(page, 1) - 1) * safeLimit(limit);
+    }
+
+    public <T> PageResult<T> pageResult(java.util.List<T> items, int page, int limit, long total) {
+        return PageResult.of(items, Math.max(page, 1), safeLimit(limit), total);
     }
 
     public Integer nz(Integer value) {

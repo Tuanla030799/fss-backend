@@ -1,10 +1,12 @@
 package com.fss.backend.content.banner;
 
 import com.fss.backend.common.ApiResponse;
+import com.fss.backend.common.PageResult;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -18,13 +20,16 @@ public class BannerController {
     }
 
     @GetMapping("/landing-banners")
-    public ApiResponse<List<LandingBanner>> publicBanners() {
-        return ApiResponse.ok("OK", service.listPublicBanners());
+    public ApiResponse<PageResult<LandingBanner>> publicBanners(@RequestParam(defaultValue = "1") @Min(1) int page,
+                                                                @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
+        return ApiResponse.ok("OK", service.listPublicBanners(page, limit));
     }
 
     @GetMapping("/admin/landing-banners")
-    public ApiResponse<List<LandingBanner>> adminBanners(@RequestParam(required = false) String status) {
-        return ApiResponse.ok("OK", service.listAdminBanners(status));
+    public ApiResponse<PageResult<LandingBanner>> adminBanners(@RequestParam(required = false) String status,
+                                                               @RequestParam(defaultValue = "1") @Min(1) int page,
+                                                               @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
+        return ApiResponse.ok("OK", service.listAdminBanners(status, page, limit));
     }
 
     @PostMapping("/admin/landing-banners")

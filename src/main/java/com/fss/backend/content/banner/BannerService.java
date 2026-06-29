@@ -1,5 +1,6 @@
 package com.fss.backend.content.banner;
 
+import com.fss.backend.common.PageResult;
 import com.fss.backend.file.FileReferenceService;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.springframework.stereotype.Service;
@@ -20,12 +21,19 @@ public class BannerService {
         this.fileReferenceService = fileReferenceService;
     }
 
-    public List<LandingBanner> listPublicBanners() {
-        return mapper.listBanners(true, null).stream().map(this::withBannerUrl).toList();
+    public PageResult<LandingBanner> listPublicBanners(int page, int limit) {
+        int safeLimit = support.safeLimit(limit);
+        List<LandingBanner> items = mapper.listBanners(true, null, safeLimit, support.offset(page, safeLimit))
+                .stream().map(this::withBannerUrl).toList();
+        return support.pageResult(items, page, safeLimit, mapper.countBanners(true, null));
     }
 
-    public List<LandingBanner> listAdminBanners(String status) {
-        return mapper.listBanners(false, support.normalizeStatusNullable(status)).stream().map(this::withBannerUrl).toList();
+    public PageResult<LandingBanner> listAdminBanners(String status, int page, int limit) {
+        String normalizedStatus = support.normalizeStatusNullable(status);
+        int safeLimit = support.safeLimit(limit);
+        List<LandingBanner> items = mapper.listBanners(false, normalizedStatus, safeLimit, support.offset(page, safeLimit))
+                .stream().map(this::withBannerUrl).toList();
+        return support.pageResult(items, page, safeLimit, mapper.countBanners(false, normalizedStatus));
     }
 
     @Transactional

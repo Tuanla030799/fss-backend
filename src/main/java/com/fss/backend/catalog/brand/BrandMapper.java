@@ -8,7 +8,8 @@ import java.util.UUID;
 
 @Mapper
 public interface BrandMapper {
-    List<Brand> listBrands(@Param("status") String status, @Param("keyword") String keyword);
+    List<Brand> listBrands(@Param("status") String status, @Param("keyword") String keyword, @Param("limit") int limit, @Param("offset") int offset);
+    long countBrands(@Param("status") String status, @Param("keyword") String keyword);
     Brand findBrandById(@Param("id") UUID id);
     Brand findBrandBySlug(@Param("slug") String slug);
     int countBrandSlug(@Param("slug") String slug, @Param("excludeId") UUID excludeId);

@@ -11,6 +11,8 @@ import java.util.UUID;
 public interface BlogPostMapper {
     List<BlogPost> listPosts(@Param("publicOnly") boolean publicOnly, @Param("status") String status,
                              @Param("keyword") String keyword, @Param("limit") int limit, @Param("offset") int offset);
+    long countPosts(@Param("publicOnly") boolean publicOnly, @Param("status") String status,
+                    @Param("keyword") String keyword);
 
     BlogPost findPostById(@Param("id") UUID id);
 

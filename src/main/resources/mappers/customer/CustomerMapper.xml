@@ -11,6 +11,15 @@
         </where>
         ORDER BY created_at DESC LIMIT #{limit} OFFSET #{offset}
     </select>
+    <select id="countCustomers" resultType="long">
+        SELECT COUNT(*)
+        FROM customers
+        <where>
+            deleted_at IS NULL
+            <if test="status != null and status != ''">AND status=#{status}</if>
+            <if test="keyword != null and keyword != ''">AND (full_name ILIKE CONCAT('%',#{keyword},'%') OR email ILIKE CONCAT('%',#{keyword},'%') OR phone ILIKE CONCAT('%',#{keyword},'%'))</if>
+        </where>
+    </select>
     <select id="findCustomerById" resultType="com.fss.backend.customer.Customer">
         SELECT id, full_name, email, phone, status, created_at FROM customers WHERE id=#{id} AND deleted_at IS NULL
     </select>

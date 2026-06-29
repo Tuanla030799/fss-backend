@@ -1,5 +1,6 @@
 package com.fss.backend.catalog.category;
 
+import com.fss.backend.common.PageResult;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,12 +18,17 @@ public class CategoryService {
         this.support = support;
     }
 
-    public List<Category> listPublicCategories() {
-        return mapper.listCategories(EcommerceSupport.ACTIVE, null);
+    public PageResult<Category> listPublicCategories(int page, int limit) {
+        int safeLimit = support.safeLimit(limit);
+        List<Category> items = mapper.listCategories(EcommerceSupport.ACTIVE, null, safeLimit, support.offset(page, safeLimit));
+        return support.pageResult(items, page, safeLimit, mapper.countCategories(EcommerceSupport.ACTIVE, null));
     }
 
-    public List<Category> listAdminCategories(String status, String keyword) {
-        return mapper.listCategories(support.normalizeStatusNullable(status), keyword);
+    public PageResult<Category> listAdminCategories(String status, String keyword, int page, int limit) {
+        String normalizedStatus = support.normalizeStatusNullable(status);
+        int safeLimit = support.safeLimit(limit);
+        List<Category> items = mapper.listCategories(normalizedStatus, keyword, safeLimit, support.offset(page, safeLimit));
+        return support.pageResult(items, page, safeLimit, mapper.countCategories(normalizedStatus, keyword));
     }
 
     @Transactional

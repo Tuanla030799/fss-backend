@@ -9,6 +9,7 @@ import java.util.UUID;
 @Mapper
 public interface AdminAccountMapper {
     List<AdminAccount> listAdminAccounts(@Param("keyword") String keyword, @Param("limit") int limit, @Param("offset") int offset);
+    long countAdminAccounts(@Param("keyword") String keyword);
     AdminAccount findAdminAccountById(@Param("id") UUID id);
     int countAdminEmail(@Param("email") String email, @Param("excludeId") UUID excludeId);
     void insertAdminAccount(@Param("id") UUID id, @Param("name") String name, @Param("email") String email,

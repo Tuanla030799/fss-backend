@@ -1,15 +1,23 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.fss.backend.catalog.category.CategoryMapper">
-    <select id="listCategories" resultType="com.fss.backend.catalog.category.Category">
-        SELECT id, parent_id, name, slug, description, status, sort_order, created_at
-        FROM categories
+    <sql id="categoryWhere">
         <where>
             deleted_at IS NULL
             <if test="status != null and status != ''">AND status = #{status}</if>
             <if test="keyword != null and keyword != ''">AND (name ILIKE CONCAT('%', #{keyword}, '%') OR slug ILIKE CONCAT('%', #{keyword}, '%'))</if>
         </where>
+    </sql>
+    <select id="listCategories" resultType="com.fss.backend.catalog.category.Category">
+        SELECT id, parent_id, name, slug, description, status, sort_order, created_at
+        FROM categories
+        <include refid="categoryWhere" />
         ORDER BY sort_order ASC, created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <select id="countCategories" resultType="long">
+        SELECT COUNT(*) FROM categories
+        <include refid="categoryWhere" />
     </select>
     <select id="findCategoryById" resultType="com.fss.backend.catalog.category.Category">
         SELECT id, parent_id, name, slug, description, status, sort_order, created_at FROM categories WHERE id=#{id} AND deleted_at IS NULL

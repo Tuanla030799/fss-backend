@@ -9,6 +9,7 @@ import java.util.UUID;
 @Mapper
 public interface CustomerMapper {
     List<Customer> listCustomers(@Param("status") String status, @Param("keyword") String keyword, @Param("limit") int limit, @Param("offset") int offset);
+    long countCustomers(@Param("status") String status, @Param("keyword") String keyword);
     Customer findCustomerById(@Param("id") UUID id);
     int countEmail(@Param("email") String email, @Param("excludeId") UUID excludeId);
     int countPhone(@Param("phone") String phone, @Param("excludeId") UUID excludeId);

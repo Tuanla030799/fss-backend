@@ -1,5 +1,6 @@
 package com.fss.backend.catalog.brand;
 
+import com.fss.backend.common.PageResult;
 import com.fss.backend.file.FileReferenceService;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.springframework.stereotype.Service;
@@ -20,8 +21,11 @@ public class BrandService {
         this.fileReferenceService = fileReferenceService;
     }
 
-    public List<Brand> listPublicBrands(String keyword) {
-        return mapper.listBrands(EcommerceSupport.ACTIVE, keyword).stream().map(this::withBrandUrl).toList();
+    public PageResult<Brand> listPublicBrands(String keyword, int page, int limit) {
+        int safeLimit = support.safeLimit(limit);
+        List<Brand> items = mapper.listBrands(EcommerceSupport.ACTIVE, keyword, safeLimit, support.offset(page, safeLimit))
+                .stream().map(this::withBrandUrl).toList();
+        return support.pageResult(items, page, safeLimit, mapper.countBrands(EcommerceSupport.ACTIVE, keyword));
     }
 
     public Brand getPublicBrand(String slug) {
@@ -30,8 +34,12 @@ public class BrandService {
         return withBrandUrl(brand);
     }
 
-    public List<Brand> listAdminBrands(String status, String keyword) {
-        return mapper.listBrands(support.normalizeStatusNullable(status), keyword).stream().map(this::withBrandUrl).toList();
+    public PageResult<Brand> listAdminBrands(String status, String keyword, int page, int limit) {
+        String normalizedStatus = support.normalizeStatusNullable(status);
+        int safeLimit = support.safeLimit(limit);
+        List<Brand> items = mapper.listBrands(normalizedStatus, keyword, safeLimit, support.offset(page, safeLimit))
+                .stream().map(this::withBrandUrl).toList();
+        return support.pageResult(items, page, safeLimit, mapper.countBrands(normalizedStatus, keyword));
     }
 
     public Brand getAdminBrand(UUID id) {

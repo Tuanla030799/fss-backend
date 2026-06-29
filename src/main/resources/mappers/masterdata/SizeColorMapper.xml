@@ -10,6 +10,16 @@
             <if test="keyword != null and keyword != ''">AND (value ILIKE CONCAT('%', #{keyword}, '%') OR label ILIKE CONCAT('%', #{keyword}, '%'))</if>
         </where>
         ORDER BY sort_order ASC, value ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <select id="countSizes" resultType="long">
+        SELECT COUNT(*)
+        FROM sizes
+        <where>
+            deleted_at IS NULL
+            <if test="status != null and status != ''">AND status = #{status}</if>
+            <if test="keyword != null and keyword != ''">AND (value ILIKE CONCAT('%', #{keyword}, '%') OR label ILIKE CONCAT('%', #{keyword}, '%'))</if>
+        </where>
     </select>
     <select id="findSizeById" resultType="com.fss.backend.masterdata.SizeOption">
         SELECT id, value, label, status, sort_order, created_at FROM sizes WHERE id=#{id} AND deleted_at IS NULL
@@ -41,6 +51,16 @@
             <if test="keyword != null and keyword != ''">AND (name ILIKE CONCAT('%', #{keyword}, '%') OR color_code ILIKE CONCAT('%', #{keyword}, '%'))</if>
         </where>
         ORDER BY sort_order ASC, name ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <select id="countColors" resultType="long">
+        SELECT COUNT(*)
+        FROM colors
+        <where>
+            deleted_at IS NULL
+            <if test="status != null and status != ''">AND status = #{status}</if>
+            <if test="keyword != null and keyword != ''">AND (name ILIKE CONCAT('%', #{keyword}, '%') OR color_code ILIKE CONCAT('%', #{keyword}, '%'))</if>
+        </where>
     </select>
     <select id="findColorById" resultType="com.fss.backend.masterdata.ColorOption">
         SELECT id, name AS value, name AS label, color_code, status, sort_order, created_at FROM colors WHERE id=#{id} AND deleted_at IS NULL

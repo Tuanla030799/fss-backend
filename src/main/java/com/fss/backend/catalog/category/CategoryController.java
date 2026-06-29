@@ -1,10 +1,12 @@
 package com.fss.backend.catalog.category;
 
 import com.fss.backend.common.ApiResponse;
+import com.fss.backend.common.PageResult;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -18,14 +20,17 @@ public class CategoryController {
     }
 
     @GetMapping("/categories")
-    public ApiResponse<List<Category>> publicCategories() {
-        return ApiResponse.ok("OK", service.listPublicCategories());
+    public ApiResponse<PageResult<Category>> publicCategories(@RequestParam(defaultValue = "1") @Min(1) int page,
+                                                              @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
+        return ApiResponse.ok("OK", service.listPublicCategories(page, limit));
     }
 
     @GetMapping("/admin/categories")
-    public ApiResponse<List<Category>> adminCategories(@RequestParam(required = false) String status,
-                                                       @RequestParam(required = false) String keyword) {
-        return ApiResponse.ok("OK", service.listAdminCategories(status, keyword));
+    public ApiResponse<PageResult<Category>> adminCategories(@RequestParam(required = false) String status,
+                                                             @RequestParam(required = false) String keyword,
+                                                             @RequestParam(defaultValue = "1") @Min(1) int page,
+                                                             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
+        return ApiResponse.ok("OK", service.listAdminCategories(status, keyword, page, limit));
     }
 
     @PostMapping("/admin/categories")

@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.fss.backend.catalog.brand.BrandMapper">
+    <sql id="brandWhere">
+        <where>
+            b.deleted_at IS NULL
+            <if test="status != null and status != ''">AND b.status = #{status}</if>
+            <if test="keyword != null and keyword != ''">AND (b.name ILIKE CONCAT('%', #{keyword}, '%') OR b.slug ILIKE CONCAT('%', #{keyword}, '%'))</if>
+        </where>
+    </sql>
     <select id="listBrands" resultType="com.fss.backend.catalog.brand.Brand">
         SELECT b.id,b.name,b.slug,b.description,
                b.file_id,f.path AS image_url,
@@ -9,12 +16,14 @@
         FROM brands b
         LEFT JOIN files f ON f.id=b.file_id
         LEFT JOIN files fs ON fs.id=b.file_size_id
-        <where>
-            b.deleted_at IS NULL
-            <if test="status != null and status != ''">AND b.status = #{status}</if>
-            <if test="keyword != null and keyword != ''">AND (b.name ILIKE CONCAT('%', #{keyword}, '%') OR b.slug ILIKE CONCAT('%', #{keyword}, '%'))</if>
-        </where>
+        <include refid="brandWhere" />
         ORDER BY b.sort_order ASC, b.created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <select id="countBrands" resultType="long">
+        SELECT COUNT(*)
+        FROM brands b
+        <include refid="brandWhere" />
     </select>
     <select id="findBrandById" resultType="com.fss.backend.catalog.brand.Brand">
         SELECT b.id,b.name,b.slug,b.description,

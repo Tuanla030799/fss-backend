@@ -10,16 +10,7 @@
         (ARRAY_AGG(f.path ORDER BY pi.is_primary DESC, pi.sort_order ASC) FILTER (WHERE f.path IS NOT NULL))[1] AS primary_image_url,
         p.created_at
     </sql>
-
-    <select id="listProducts" resultType="com.fss.backend.catalog.product.ProductSummary">
-        SELECT <include refid="productSummarySelect" />
-        FROM products p
-        JOIN categories c ON c.id = p.category_id
-        LEFT JOIN brands b ON b.id = p.brand_id
-        LEFT JOIN files bfs ON bfs.id = b.file_size_id
-        LEFT JOIN skus s ON s.product_id = p.id AND s.deleted_at IS NULL
-        LEFT JOIN product_images pi ON pi.product_id = p.id
-        LEFT JOIN files f ON f.id = pi.file_id
+    <sql id="productFilters">
         <where>
             p.deleted_at IS NULL
             <if test="publicOnly">AND p.status = 'ACTIVE' AND c.status = 'ACTIVE' AND c.deleted_at IS NULL AND (b.id IS NULL OR (b.status = 'ACTIVE' AND b.deleted_at IS NULL))</if>
@@ -64,9 +55,28 @@
             <if test="minPrice != null">AND EXISTS (SELECT 1 FROM skus sp WHERE sp.product_id=p.id AND sp.deleted_at IS NULL AND COALESCE(sp.sale_price, sp.price) &gt;= #{minPrice})</if>
             <if test="maxPrice != null">AND EXISTS (SELECT 1 FROM skus sp WHERE sp.product_id=p.id AND sp.deleted_at IS NULL AND COALESCE(sp.sale_price, sp.price) &lt;= #{maxPrice})</if>
         </where>
+    </sql>
+
+    <select id="listProducts" resultType="com.fss.backend.catalog.product.ProductSummary">
+        SELECT <include refid="productSummarySelect" />
+        FROM products p
+        JOIN categories c ON c.id = p.category_id
+        LEFT JOIN brands b ON b.id = p.brand_id
+        LEFT JOIN files bfs ON bfs.id = b.file_size_id
+        LEFT JOIN skus s ON s.product_id = p.id AND s.deleted_at IS NULL
+        LEFT JOIN product_images pi ON pi.product_id = p.id
+        LEFT JOIN files f ON f.id = pi.file_id
+        <include refid="productFilters" />
         GROUP BY p.id, c.name, b.name, b.slug, bfs.path
         ORDER BY <if test="featuredOnly">p.featured_order ASC,</if> p.created_at DESC
         LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <select id="countProducts" resultType="long">
+        SELECT COUNT(*)
+        FROM products p
+        JOIN categories c ON c.id = p.category_id
+        LEFT JOIN brands b ON b.id = p.brand_id
+        <include refid="productFilters" />
     </select>
     <select id="findProductDescriptionJson" resultType="string">
         SELECT description_json::text FROM products WHERE id=#{id} AND deleted_at IS NULL

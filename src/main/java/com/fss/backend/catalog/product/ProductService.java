@@ -5,6 +5,7 @@ import com.fss.backend.catalog.brand.BrandMapper;
 import com.fss.backend.catalog.category.CategoryMapper;
 import com.fss.backend.catalog.sku.Sku;
 import com.fss.backend.catalog.sku.SkuRequest;
+import com.fss.backend.common.PageResult;
 import com.fss.backend.content.html.HtmlContentImageUsageService;
 import com.fss.backend.content.html.HtmlSanitizerService;
 import com.fss.backend.file.FileReferenceService;
@@ -54,22 +55,41 @@ public class ProductService {
         this.fileReferenceService = fileReferenceService;
     }
 
-    public List<ProductSummary> listPublicProducts(List<UUID> categoryIds, String categorySlug, List<UUID> brandIds, String brandSlug, List<String> genders, String keyword, List<String> sizes,
-                                                   List<String> colors, BigDecimal minPrice, BigDecimal maxPrice,
-                                                   int page, int limit) {
-        return mapper.listProducts(true, null, normalizeUuidFilters(categoryIds), categorySlug, normalizeUuidFilters(brandIds), brandSlug,
-                normalizeGenderFilters(genders), support.trimToNull(keyword), normalizeTextFilters(sizes), normalizeTextFilters(colors), minPrice, maxPrice,
-                false, support.safeLimit(limit), support.offset(page, limit)).stream().map(this::withProductUrl).toList();
+    public PageResult<ProductSummary> listPublicProducts(List<UUID> categoryIds, String categorySlug, List<UUID> brandIds, String brandSlug, List<String> genders, String keyword, List<String> sizes,
+                                                         List<String> colors, BigDecimal minPrice, BigDecimal maxPrice,
+                                                         int page, int limit) {
+        List<UUID> normalizedCategoryIds = normalizeUuidFilters(categoryIds);
+        List<UUID> normalizedBrandIds = normalizeUuidFilters(brandIds);
+        List<String> normalizedGenders = normalizeGenderFilters(genders);
+        String normalizedKeyword = support.trimToNull(keyword);
+        List<String> normalizedSizes = normalizeTextFilters(sizes);
+        List<String> normalizedColors = normalizeTextFilters(colors);
+        int safeLimit = support.safeLimit(limit);
+        List<ProductSummary> items = mapper.listProducts(true, null, normalizedCategoryIds, categorySlug, normalizedBrandIds, brandSlug,
+                normalizedGenders, normalizedKeyword, normalizedSizes, normalizedColors, minPrice, maxPrice,
+                false, safeLimit, support.offset(page, safeLimit)).stream().map(this::withProductUrl).toList();
+        long total = mapper.countProducts(true, null, normalizedCategoryIds, categorySlug, normalizedBrandIds, brandSlug,
+                normalizedGenders, normalizedKeyword, normalizedSizes, normalizedColors, minPrice, maxPrice, false);
+        return support.pageResult(items, page, safeLimit, total);
     }
 
-    public List<ProductSummary> listAdminProducts(String status, UUID categoryId, UUID brandId, String gender, String size, String color, String keyword, int page, int limit) {
-        return mapper.listProducts(false, support.normalizeProductStatusNullable(status),
-                normalizeUuidFilters(categoryId == null ? null : List.of(categoryId)), null,
-                normalizeUuidFilters(brandId == null ? null : List.of(brandId)), null,
-                normalizeGenderFilters(gender == null ? null : List.of(gender)), support.trimToNull(keyword),
-                normalizeTextFilters(size == null ? null : List.of(size)), normalizeTextFilters(color == null ? null : List.of(color)),
-                null, null, false, support.safeLimit(limit), support.offset(page, limit))
+    public PageResult<ProductSummary> listAdminProducts(String status, UUID categoryId, UUID brandId, String gender, String size, String color, String keyword, int page, int limit) {
+        String normalizedStatus = support.normalizeProductStatusNullable(status);
+        List<UUID> normalizedCategoryIds = normalizeUuidFilters(categoryId == null ? null : List.of(categoryId));
+        List<UUID> normalizedBrandIds = normalizeUuidFilters(brandId == null ? null : List.of(brandId));
+        List<String> normalizedGenders = normalizeGenderFilters(gender == null ? null : List.of(gender));
+        String normalizedKeyword = support.trimToNull(keyword);
+        List<String> normalizedSizes = normalizeTextFilters(size == null ? null : List.of(size));
+        List<String> normalizedColors = normalizeTextFilters(color == null ? null : List.of(color));
+        int safeLimit = support.safeLimit(limit);
+        List<ProductSummary> items = mapper.listProducts(false, normalizedStatus,
+                normalizedCategoryIds, null, normalizedBrandIds, null,
+                normalizedGenders, normalizedKeyword, normalizedSizes, normalizedColors,
+                null, null, false, safeLimit, support.offset(page, safeLimit))
                 .stream().map(this::withProductUrl).toList();
+        long total = mapper.countProducts(false, normalizedStatus, normalizedCategoryIds, null, normalizedBrandIds, null,
+                normalizedGenders, normalizedKeyword, normalizedSizes, normalizedColors, null, null, false);
+        return support.pageResult(items, page, safeLimit, total);
     }
 
     @Cacheable(value = "featuredProducts", key = "#limit")

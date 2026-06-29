@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import com.fss.backend.common.PageResult;
 
 @RestController
 @RequestMapping("/api")
@@ -23,18 +24,18 @@ public class ProductController {
     }
 
     @GetMapping("/products")
-    public ApiResponse<List<ProductSummary>> publicProducts(@RequestParam(name = "categoryId", required = false) List<UUID> categoryIds,
-                                                            @RequestParam(required = false) String categorySlug,
-                                                            @RequestParam(name = "brandId", required = false) List<UUID> brandIds,
-                                                            @RequestParam(required = false) String brandSlug,
-                                                            @RequestParam(required = false) List<String> gender,
-                                                            @RequestParam(required = false) String keyword,
-                                                            @RequestParam(required = false) List<String> size,
-                                                            @RequestParam(required = false) List<String> color,
-                                                            @RequestParam(required = false) BigDecimal minPrice,
-                                                            @RequestParam(required = false) BigDecimal maxPrice,
-                                                            @RequestParam(defaultValue = "1") @Min(1) int page,
-                                                            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
+    public ApiResponse<PageResult<ProductSummary>> publicProducts(@RequestParam(name = "categoryId", required = false) List<UUID> categoryIds,
+                                                                  @RequestParam(required = false) String categorySlug,
+                                                                  @RequestParam(name = "brandId", required = false) List<UUID> brandIds,
+                                                                  @RequestParam(required = false) String brandSlug,
+                                                                  @RequestParam(required = false) List<String> gender,
+                                                                  @RequestParam(required = false) String keyword,
+                                                                  @RequestParam(required = false) List<String> size,
+                                                                  @RequestParam(required = false) List<String> color,
+                                                                  @RequestParam(required = false) BigDecimal minPrice,
+                                                                  @RequestParam(required = false) BigDecimal maxPrice,
+                                                                  @RequestParam(defaultValue = "1") @Min(1) int page,
+                                                                  @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
         return ApiResponse.ok("OK", service.listPublicProducts(categoryIds, categorySlug, brandIds, brandSlug, gender, keyword, size, color, minPrice, maxPrice, page, limit));
     }
 
@@ -49,15 +50,15 @@ public class ProductController {
     }
 
     @GetMapping("/admin/products")
-    public ApiResponse<List<ProductSummary>> adminProducts(@RequestParam(required = false) String status,
-                                                           @RequestParam(required = false) UUID categoryId,
-                                                           @RequestParam(required = false) UUID brandId,
-                                                           @RequestParam(required = false) String gender,
-                                                           @RequestParam(required = false) String size,
-                                                           @RequestParam(required = false) String color,
-                                                           @RequestParam(required = false) String keyword,
-                                                           @RequestParam(defaultValue = "1") @Min(1) int page,
-                                                           @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
+    public ApiResponse<PageResult<ProductSummary>> adminProducts(@RequestParam(required = false) String status,
+                                                                 @RequestParam(required = false) UUID categoryId,
+                                                                 @RequestParam(required = false) UUID brandId,
+                                                                 @RequestParam(required = false) String gender,
+                                                                 @RequestParam(required = false) String size,
+                                                                 @RequestParam(required = false) String color,
+                                                                 @RequestParam(required = false) String keyword,
+                                                                 @RequestParam(defaultValue = "1") @Min(1) int page,
+                                                                 @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
         return ApiResponse.ok("OK", service.listAdminProducts(status, categoryId, brandId, gender, size, color, keyword, page, limit));
     }
 

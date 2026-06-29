@@ -1,5 +1,6 @@
 package com.fss.backend.customer;
 
+import com.fss.backend.common.PageResult;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,8 +18,11 @@ public class CustomerService {
         this.support = support;
     }
 
-    public List<Customer> listCustomers(String status, String keyword, int page, int limit) {
-        return mapper.listCustomers(support.normalizeStatusNullable(status), keyword, support.safeLimit(limit), support.offset(page, limit));
+    public PageResult<Customer> listCustomers(String status, String keyword, int page, int limit) {
+        String normalizedStatus = support.normalizeStatusNullable(status);
+        int safeLimit = support.safeLimit(limit);
+        List<Customer> items = mapper.listCustomers(normalizedStatus, keyword, safeLimit, support.offset(page, safeLimit));
+        return support.pageResult(items, page, safeLimit, mapper.countCustomers(normalizedStatus, keyword));
     }
 
     public Customer getCustomer(UUID id) {

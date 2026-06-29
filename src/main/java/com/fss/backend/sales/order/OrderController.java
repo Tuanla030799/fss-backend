@@ -1,6 +1,7 @@
 package com.fss.backend.sales.order;
 
 import com.fss.backend.common.ApiResponse;
+import com.fss.backend.common.PageResult;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -24,10 +25,10 @@ public class OrderController {
     }
 
     @GetMapping("/admin/orders")
-    public ApiResponse<List<Order>> adminOrders(@RequestParam(required = false) String status,
-                                                @RequestParam(required = false) String keyword,
-                                                @RequestParam(defaultValue = "1") @Min(1) int page,
-                                                @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
+    public ApiResponse<PageResult<Order>> adminOrders(@RequestParam(required = false) String status,
+                                                      @RequestParam(required = false) String keyword,
+                                                      @RequestParam(defaultValue = "1") @Min(1) int page,
+                                                      @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
         return ApiResponse.ok("OK", service.listOrders(status, keyword, page, limit));
     }
 

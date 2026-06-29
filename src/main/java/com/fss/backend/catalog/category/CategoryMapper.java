@@ -8,7 +8,8 @@ import java.util.UUID;
 
 @Mapper
 public interface CategoryMapper {
-    List<Category> listCategories(@Param("status") String status, @Param("keyword") String keyword);
+    List<Category> listCategories(@Param("status") String status, @Param("keyword") String keyword, @Param("limit") int limit, @Param("offset") int offset);
+    long countCategories(@Param("status") String status, @Param("keyword") String keyword);
     Category findCategoryById(@Param("id") UUID id);
     Category findCategoryBySlug(@Param("slug") String slug);
     int countCategorySlug(@Param("slug") String slug, @Param("excludeId") UUID excludeId);

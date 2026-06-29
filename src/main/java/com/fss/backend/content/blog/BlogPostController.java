@@ -1,12 +1,12 @@
 package com.fss.backend.content.blog;
 
 import com.fss.backend.common.ApiResponse;
+import com.fss.backend.common.PageResult;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -20,9 +20,9 @@ public class BlogPostController {
     }
 
     @GetMapping("/blogs")
-    public ApiResponse<List<BlogPost>> publicPosts(@RequestParam(required = false) String keyword,
-                                                   @RequestParam(defaultValue = "1") @Min(1) int page,
-                                                   @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
+    public ApiResponse<PageResult<BlogPost>> publicPosts(@RequestParam(required = false) String keyword,
+                                                         @RequestParam(defaultValue = "1") @Min(1) int page,
+                                                         @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
         return ApiResponse.ok("OK", service.listPublicPosts(keyword, page, limit));
     }
 
@@ -32,10 +32,10 @@ public class BlogPostController {
     }
 
     @GetMapping("/admin/blogs")
-    public ApiResponse<List<BlogPost>> adminPosts(@RequestParam(required = false) String status,
-                                                 @RequestParam(required = false) String keyword,
-                                                 @RequestParam(defaultValue = "1") @Min(1) int page,
-                                                 @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
+    public ApiResponse<PageResult<BlogPost>> adminPosts(@RequestParam(required = false) String status,
+                                                        @RequestParam(required = false) String keyword,
+                                                        @RequestParam(defaultValue = "1") @Min(1) int page,
+                                                        @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
         return ApiResponse.ok("OK", service.listAdminPosts(status, keyword, page, limit));
     }
 

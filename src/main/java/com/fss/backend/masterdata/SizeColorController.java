@@ -1,10 +1,12 @@
 package com.fss.backend.masterdata;
 
 import com.fss.backend.common.ApiResponse;
+import com.fss.backend.common.PageResult;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -18,9 +20,11 @@ public class SizeColorController {
     }
 
     @GetMapping("/admin/sizes")
-    public ApiResponse<List<SizeOption>> adminSizes(@RequestParam(required = false) String status,
-                                                    @RequestParam(required = false) String keyword) {
-        return ApiResponse.ok("OK", service.listSizes(status, keyword));
+    public ApiResponse<PageResult<SizeOption>> adminSizes(@RequestParam(required = false) String status,
+                                                          @RequestParam(required = false) String keyword,
+                                                          @RequestParam(defaultValue = "1") @Min(1) int page,
+                                                          @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
+        return ApiResponse.ok("OK", service.listSizes(status, keyword, page, limit));
     }
 
     @GetMapping("/admin/sizes/{id}")
@@ -46,9 +50,11 @@ public class SizeColorController {
     }
 
     @GetMapping("/admin/colors")
-    public ApiResponse<List<ColorOption>> adminColors(@RequestParam(required = false) String status,
-                                                      @RequestParam(required = false) String keyword) {
-        return ApiResponse.ok("OK", service.listColors(status, keyword));
+    public ApiResponse<PageResult<ColorOption>> adminColors(@RequestParam(required = false) String status,
+                                                            @RequestParam(required = false) String keyword,
+                                                            @RequestParam(defaultValue = "1") @Min(1) int page,
+                                                            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
+        return ApiResponse.ok("OK", service.listColors(status, keyword, page, limit));
     }
 
     @GetMapping("/admin/colors/{id}")

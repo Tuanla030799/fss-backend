@@ -1,5 +1,6 @@
 package com.fss.backend.content.blog;
 
+import com.fss.backend.common.PageResult;
 import com.fss.backend.content.html.HtmlContentImageUsageService;
 import com.fss.backend.content.html.HtmlSanitizerService;
 import com.fss.backend.file.FileReferenceService;
@@ -34,9 +35,11 @@ public class BlogPostService {
         this.fileReferenceService = fileReferenceService;
     }
 
-    public List<BlogPost> listPublicPosts(String keyword, int page, int limit) {
-        return mapper.listPosts(true, null, keyword, support.safeLimit(limit), support.offset(page, limit))
+    public PageResult<BlogPost> listPublicPosts(String keyword, int page, int limit) {
+        int safeLimit = support.safeLimit(limit);
+        List<BlogPost> items = mapper.listPosts(true, null, keyword, safeLimit, support.offset(page, safeLimit))
                 .stream().map(this::withCoverUrl).toList();
+        return support.pageResult(items, page, safeLimit, mapper.countPosts(true, null, keyword));
     }
 
     public BlogPost getPublicPost(String slug) {
@@ -45,9 +48,12 @@ public class BlogPostService {
         return withCoverUrl(post);
     }
 
-    public List<BlogPost> listAdminPosts(String status, String keyword, int page, int limit) {
-        return mapper.listPosts(false, normalizePostStatusNullable(status), keyword, support.safeLimit(limit), support.offset(page, limit))
+    public PageResult<BlogPost> listAdminPosts(String status, String keyword, int page, int limit) {
+        String normalizedStatus = normalizePostStatusNullable(status);
+        int safeLimit = support.safeLimit(limit);
+        List<BlogPost> items = mapper.listPosts(false, normalizedStatus, keyword, safeLimit, support.offset(page, safeLimit))
                 .stream().map(this::withCoverUrl).toList();
+        return support.pageResult(items, page, safeLimit, mapper.countPosts(false, normalizedStatus, keyword));
     }
 
     public BlogPost getAdminPost(UUID id) {

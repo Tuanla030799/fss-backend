@@ -13,6 +13,7 @@ public interface CouponMapper {
     Coupon findCouponByCode(@Param("code") String code);
     Coupon findCouponById(@Param("id") UUID id);
     List<Coupon> listCoupons(@Param("status") String status, @Param("keyword") String keyword, @Param("limit") int limit, @Param("offset") int offset);
+    long countCoupons(@Param("status") String status, @Param("keyword") String keyword);
     void insertCoupon(@Param("id") UUID id, @Param("code") String code, @Param("name") String name,
                       @Param("discountType") String discountType, @Param("discountValue") BigDecimal discountValue,
                       @Param("maxDiscount") BigDecimal maxDiscount, @Param("minOrderAmount") BigDecimal minOrderAmount,

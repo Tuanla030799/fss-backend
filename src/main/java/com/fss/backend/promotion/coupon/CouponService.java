@@ -1,5 +1,6 @@
 package com.fss.backend.promotion.coupon;
 
+import com.fss.backend.common.PageResult;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,8 +22,11 @@ public class CouponService {
         this.support = support;
     }
 
-    public List<Coupon> listCoupons(String status, String keyword, int page, int limit) {
-        return mapper.listCoupons(support.normalizeStatusNullable(status), keyword, support.safeLimit(limit), support.offset(page, limit));
+    public PageResult<Coupon> listCoupons(String status, String keyword, int page, int limit) {
+        String normalizedStatus = support.normalizeStatusNullable(status);
+        int safeLimit = support.safeLimit(limit);
+        List<Coupon> items = mapper.listCoupons(normalizedStatus, keyword, safeLimit, support.offset(page, safeLimit));
+        return support.pageResult(items, page, safeLimit, mapper.countCoupons(normalizedStatus, keyword));
     }
 
     @Transactional
