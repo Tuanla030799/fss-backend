@@ -44,6 +44,37 @@ docker compose up --build
 
 Compose tự dùng profile `docker`, mount `./uploads` vào `/app/uploads` và `./logs` vào `/app/logs`.
 
+## Backup production
+Backup đầy đủ cần gồm cả PostgreSQL và thư mục `uploads` vì DB chỉ lưu metadata/đường dẫn file.
+
+```bash
+chmod +x scripts/backup-prod.sh
+./scripts/backup-prod.sh
+```
+
+Script sẽ tạo thư mục `backups/<timestamp>/` gồm:
+- `fss_db.dump`
+- `uploads.tar.gz`
+- `.env.production`
+- `backup-info.txt`
+
+Có thể dùng `./scripts/backup-prod.sh --no-stop-api` nếu muốn backup nóng.
+
+## Restore production
+Restore sẽ ghi đè dữ liệu DB hiện tại và thay nội dung `uploads`, nên script bắt buộc có cờ xác nhận.
+
+```bash
+chmod +x scripts/restore-prod.sh
+./scripts/restore-prod.sh --backup-dir backups/2026-06-29-134700 --yes
+```
+
+Script sẽ:
+- dừng `api`
+- restore `fss_db.dump` vào PostgreSQL hiện tại
+- đổi tên `uploads` hiện tại thành `uploads.before-restore-<timestamp>`
+- giải nén `uploads.tar.gz`
+- bật lại `api` nếu restore thành công
+
 Deploy production trên Google Cloud VM: xem [docs/deploy-google-cloud-vm.md](docs/deploy-google-cloud-vm.md).
 CI/CD deploy nhánh `dev`: xem [docs/cicd-dev-deploy.md](docs/cicd-dev-deploy.md).
 
