@@ -28,6 +28,8 @@ import java.util.UUID;
 
 @Service
 public class ProductService {
+    private static final String DEFAULT_SIZE_VALUE = "DEFAULT";
+
     private final ProductMapper mapper;
     private final CategoryMapper categoryMapper;
     private final BrandMapper brandMapper;
@@ -149,7 +151,7 @@ public class ProductService {
         List<ProductVariant> variants = mapper.listVariants(summary.id()).stream().map(this::withVariantUrl).toList();
         List<Sku> skus = mapper.listSkus(summary.id());
         return new ProductDetail(summary.id(), summary.categoryId(), summary.categoryName(), summary.brandId(), summary.brandName(),
-                summary.brandSlug(), summary.gender(), summary.name(), summary.slug(),
+                summary.brandSlug(), support.publicUrl(summary.brandSizeGuideUrl()), summary.gender(), summary.name(), summary.slug(),
                 summary.shortDescription(), "{}", loadDescriptionHtml(summary.id()), summary.status(), summary.isFeatured(),
                 summary.featuredOrder(), summary.createdAt(), images, variants, skus);
     }
@@ -309,9 +311,10 @@ public class ProductService {
     }
 
     private SizeValue resolveSize(SkuRequest sku) {
-        support.require(sku.sizeId() != null, "Size is required");
-        SizeOption size = sizeColorMapper.findSizeById(sku.sizeId());
-        support.require(size != null, "Size not found");
+        SizeOption size = sku.sizeId() != null
+                ? sizeColorMapper.findSizeById(sku.sizeId())
+                : sizeColorMapper.findSizeByValue(DEFAULT_SIZE_VALUE);
+        support.require(size != null, "Default size is not configured");
         support.require(EcommerceSupport.ACTIVE.equals(size.status()), "Size is inactive");
         return new SizeValue(size.id(), size.value());
     }
@@ -325,8 +328,9 @@ public class ProductService {
     }
 
     private ProductSummary withProductUrl(ProductSummary product) {
-        return product == null || product.primaryImageUrl() == null ? product : new ProductSummary(product.id(), product.categoryId(),
-                product.categoryName(), product.brandId(), product.brandName(), product.brandSlug(), product.gender(), product.name(), product.slug(), product.shortDescription(), product.status(),
+        return product == null ? null : new ProductSummary(product.id(), product.categoryId(),
+                product.categoryName(), product.brandId(), product.brandName(), product.brandSlug(), support.publicUrl(product.brandSizeGuideUrl()),
+                product.gender(), product.name(), product.slug(), product.shortDescription(), product.status(),
                 product.isFeatured(), product.featuredOrder(), product.minPrice(), product.minSalePrice(), product.totalStock(),
                 product.primaryFileId(), support.publicUrl(product.primaryImageUrl()), product.createdAt());
     }

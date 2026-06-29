@@ -20,3 +20,6 @@ uploads/
 .idea/
 *.iml
 .DS_Store
+
+#backup
+backups/

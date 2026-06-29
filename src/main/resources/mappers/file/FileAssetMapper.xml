@@ -42,6 +42,10 @@
                         WHERE b.file_id = #{id}
                           AND b.deleted_at IS NULL), 0)
             + COALESCE((SELECT COUNT(*)
+                        FROM brands b
+                        WHERE b.file_size_id = #{id}
+                          AND b.deleted_at IS NULL), 0)
+            + COALESCE((SELECT COUNT(*)
                         FROM landing_banners lb
                         WHERE lb.file_id = #{id}
                           AND lb.deleted_at IS NULL), 0)

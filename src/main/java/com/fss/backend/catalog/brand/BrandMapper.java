@@ -14,10 +14,12 @@ public interface BrandMapper {
     int countBrandSlug(@Param("slug") String slug, @Param("excludeId") UUID excludeId);
     void insertBrand(@Param("id") UUID id, @Param("name") String name, @Param("slug") String slug,
                      @Param("description") String description, @Param("fileId") UUID fileId,
+                     @Param("fileSizeId") UUID fileSizeId,
                      @Param("status") String status, @Param("sortOrder") Integer sortOrder,
                      @Param("adminId") UUID adminId);
     void updateBrand(@Param("id") UUID id, @Param("name") String name, @Param("slug") String slug,
                      @Param("description") String description, @Param("fileId") UUID fileId,
+                     @Param("fileSizeId") UUID fileSizeId,
                      @Param("status") String status, @Param("sortOrder") Integer sortOrder,
                      @Param("adminId") UUID adminId);
     void softDeleteBrand(@Param("id") UUID id, @Param("adminId") UUID adminId);

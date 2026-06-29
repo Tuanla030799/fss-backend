@@ -44,8 +44,9 @@ public class BrandService {
     public UUID createBrand(BrandRequest request) {
         UUID id = UUID.randomUUID();
         support.activateFile(request.fileId());
+        support.activateFile(request.fileSizeId());
         mapper.insertBrand(id, request.name().trim(), uniqueSlug(request.slug(), request.name(), null),
-                request.description(), request.fileId(),
+                request.description(), request.fileId(), request.fileSizeId(),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
                 support.nz(request.sortOrder()), support.adminId());
         return id;
@@ -56,11 +57,13 @@ public class BrandService {
         Brand existing = mapper.findBrandById(id);
         support.require(existing != null, "Brand not found");
         support.activateFile(request.fileId());
+        support.activateFile(request.fileSizeId());
         mapper.updateBrand(id, request.name().trim(), uniqueSlug(request.slug(), request.name(), id),
-                request.description(), request.fileId(),
+                request.description(), request.fileId(), request.fileSizeId(),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
                 support.nz(request.sortOrder()), support.adminId());
         fileReferenceService.releaseFile(existing.fileId());
+        fileReferenceService.releaseFile(existing.fileSizeId());
     }
 
     @Transactional
@@ -69,6 +72,7 @@ public class BrandService {
         support.require(existing != null, "Brand not found");
         mapper.softDeleteBrand(id, support.adminId());
         fileReferenceService.releaseFile(existing.fileId());
+        fileReferenceService.releaseFile(existing.fileSizeId());
     }
 
     private String uniqueSlug(String slug, String name, UUID exclude) {
@@ -78,8 +82,18 @@ public class BrandService {
     }
 
     private Brand withBrandUrl(Brand brand) {
-        return brand == null || brand.imageUrl() == null ? brand : new Brand(brand.id(), brand.name(), brand.slug(),
-                brand.description(), brand.fileId(), support.publicUrl(brand.imageUrl()), brand.status(),
-                brand.sortOrder(), brand.createdAt());
+        return brand == null ? null : new Brand(
+                brand.id(),
+                brand.name(),
+                brand.slug(),
+                brand.description(),
+                brand.fileId(),
+                support.publicUrl(brand.imageUrl()),
+                brand.fileSizeId(),
+                support.publicUrl(brand.sizeGuideImageUrl()),
+                brand.status(),
+                brand.sortOrder(),
+                brand.createdAt()
+        );
     }
 }

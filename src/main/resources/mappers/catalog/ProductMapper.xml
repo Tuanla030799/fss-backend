@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.fss.backend.catalog.product.ProductMapper">
     <sql id="productSummarySelect">
-        p.id, p.category_id, c.name AS category_name, p.brand_id, b.name AS brand_name, b.slug AS brand_slug, p.gender,
+        p.id, p.category_id, c.name AS category_name, p.brand_id, b.name AS brand_name, b.slug AS brand_slug, bfs.path AS brand_size_guide_url, p.gender,
         p.name, p.slug, p.short_description, p.status, p.is_featured,
         p.featured_order, MIN(s.price) AS min_price, MIN(COALESCE(s.sale_price, s.price)) AS min_sale_price,
         COALESCE(SUM(s.stock), 0)::int AS total_stock,
@@ -16,6 +16,7 @@
         FROM products p
         JOIN categories c ON c.id = p.category_id
         LEFT JOIN brands b ON b.id = p.brand_id
+        LEFT JOIN files bfs ON bfs.id = b.file_size_id
         LEFT JOIN skus s ON s.product_id = p.id AND s.deleted_at IS NULL
         LEFT JOIN product_images pi ON pi.product_id = p.id
         LEFT JOIN files f ON f.id = pi.file_id
@@ -63,7 +64,7 @@
             <if test="minPrice != null">AND EXISTS (SELECT 1 FROM skus sp WHERE sp.product_id=p.id AND sp.deleted_at IS NULL AND COALESCE(sp.sale_price, sp.price) &gt;= #{minPrice})</if>
             <if test="maxPrice != null">AND EXISTS (SELECT 1 FROM skus sp WHERE sp.product_id=p.id AND sp.deleted_at IS NULL AND COALESCE(sp.sale_price, sp.price) &lt;= #{maxPrice})</if>
         </where>
-        GROUP BY p.id, c.name, b.name, b.slug
+        GROUP BY p.id, c.name, b.name, b.slug, bfs.path
         ORDER BY <if test="featuredOnly">p.featured_order ASC,</if> p.created_at DESC
         LIMIT #{limit} OFFSET #{offset}
     </select>
@@ -77,21 +78,23 @@
         SELECT <include refid="productSummarySelect" />
         FROM products p JOIN categories c ON c.id=p.category_id
         LEFT JOIN brands b ON b.id=p.brand_id
+        LEFT JOIN files bfs ON bfs.id = b.file_size_id
         LEFT JOIN skus s ON s.product_id=p.id AND s.deleted_at IS NULL
         LEFT JOIN product_images pi ON pi.product_id=p.id
         LEFT JOIN files f ON f.id=pi.file_id
         WHERE p.id=#{id} AND p.deleted_at IS NULL
-        GROUP BY p.id, c.name, b.name, b.slug
+        GROUP BY p.id, c.name, b.name, b.slug, bfs.path
     </select>
     <select id="findProductSummaryBySlug" resultType="com.fss.backend.catalog.product.ProductSummary">
         SELECT <include refid="productSummarySelect" />
         FROM products p JOIN categories c ON c.id=p.category_id
         LEFT JOIN brands b ON b.id=p.brand_id
+        LEFT JOIN files bfs ON bfs.id = b.file_size_id
         LEFT JOIN skus s ON s.product_id=p.id AND s.deleted_at IS NULL
         LEFT JOIN product_images pi ON pi.product_id=p.id
         LEFT JOIN files f ON f.id=pi.file_id
         WHERE p.slug=#{slug} AND p.deleted_at IS NULL <if test="publicOnly">AND p.status='ACTIVE' AND c.status='ACTIVE' AND (b.id IS NULL OR (b.status='ACTIVE' AND b.deleted_at IS NULL))</if>
-        GROUP BY p.id, c.name, b.name, b.slug
+        GROUP BY p.id, c.name, b.name, b.slug, bfs.path
     </select>
     <select id="countProductSlug" resultType="int">
         SELECT COUNT(*) FROM products WHERE slug=#{slug} AND deleted_at IS NULL <if test="excludeId != null">AND id != #{excludeId}</if>

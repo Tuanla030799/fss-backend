@@ -2,8 +2,13 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.fss.backend.catalog.brand.BrandMapper">
     <select id="listBrands" resultType="com.fss.backend.catalog.brand.Brand">
-        SELECT b.id,b.name,b.slug,b.description,b.file_id,f.path AS image_url,b.status,b.sort_order,b.created_at
-        FROM brands b LEFT JOIN files f ON f.id=b.file_id
+        SELECT b.id,b.name,b.slug,b.description,
+               b.file_id,f.path AS image_url,
+               b.file_size_id,fs.path AS size_guide_image_url,
+               b.status,b.sort_order,b.created_at
+        FROM brands b
+        LEFT JOIN files f ON f.id=b.file_id
+        LEFT JOIN files fs ON fs.id=b.file_size_id
         <where>
             b.deleted_at IS NULL
             <if test="status != null and status != ''">AND b.status = #{status}</if>
@@ -12,24 +17,34 @@
         ORDER BY b.sort_order ASC, b.created_at DESC
     </select>
     <select id="findBrandById" resultType="com.fss.backend.catalog.brand.Brand">
-        SELECT b.id,b.name,b.slug,b.description,b.file_id,f.path AS image_url,b.status,b.sort_order,b.created_at
-        FROM brands b LEFT JOIN files f ON f.id=b.file_id
+        SELECT b.id,b.name,b.slug,b.description,
+               b.file_id,f.path AS image_url,
+               b.file_size_id,fs.path AS size_guide_image_url,
+               b.status,b.sort_order,b.created_at
+        FROM brands b
+        LEFT JOIN files f ON f.id=b.file_id
+        LEFT JOIN files fs ON fs.id=b.file_size_id
         WHERE b.id=#{id} AND b.deleted_at IS NULL
     </select>
     <select id="findBrandBySlug" resultType="com.fss.backend.catalog.brand.Brand">
-        SELECT b.id,b.name,b.slug,b.description,b.file_id,f.path AS image_url,b.status,b.sort_order,b.created_at
-        FROM brands b LEFT JOIN files f ON f.id=b.file_id
+        SELECT b.id,b.name,b.slug,b.description,
+               b.file_id,f.path AS image_url,
+               b.file_size_id,fs.path AS size_guide_image_url,
+               b.status,b.sort_order,b.created_at
+        FROM brands b
+        LEFT JOIN files f ON f.id=b.file_id
+        LEFT JOIN files fs ON fs.id=b.file_size_id
         WHERE b.slug=#{slug} AND b.deleted_at IS NULL
     </select>
     <select id="countBrandSlug" resultType="int">
         SELECT COUNT(*) FROM brands WHERE slug=#{slug} AND deleted_at IS NULL <if test="excludeId != null">AND id != #{excludeId}</if>
     </select>
     <insert id="insertBrand">
-        INSERT INTO brands(id,name,slug,description,file_id,status,sort_order,created_by,updated_by)
-        VALUES(#{id},#{name},#{slug},#{description},#{fileId},#{status},#{sortOrder},#{adminId},#{adminId})
+        INSERT INTO brands(id,name,slug,description,file_id,file_size_id,status,sort_order,created_by,updated_by)
+        VALUES(#{id},#{name},#{slug},#{description},#{fileId},#{fileSizeId},#{status},#{sortOrder},#{adminId},#{adminId})
     </insert>
     <update id="updateBrand">
-        UPDATE brands SET name=#{name}, slug=#{slug}, description=#{description}, file_id=#{fileId},
+        UPDATE brands SET name=#{name}, slug=#{slug}, description=#{description}, file_id=#{fileId}, file_size_id=#{fileSizeId},
             status=#{status}, sort_order=#{sortOrder}, updated_by=#{adminId}
         WHERE id=#{id} AND deleted_at IS NULL
     </update>

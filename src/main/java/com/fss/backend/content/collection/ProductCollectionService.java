@@ -135,7 +135,7 @@ public class ProductCollectionService {
 
     private ProductSummary withProductUrl(ProductSummary product) {
         return product == null || product.primaryImageUrl() == null ? product : new ProductSummary(product.id(), product.categoryId(),
-                product.categoryName(), product.brandId(), product.brandName(), product.brandSlug(), product.gender(), product.name(), product.slug(), product.shortDescription(), product.status(),
+                product.categoryName(), product.brandId(), product.brandName(), product.brandSlug(), product.brandSizeGuideUrl(), product.gender(), product.name(), product.slug(), product.shortDescription(), product.status(),
                 product.isFeatured(), product.featuredOrder(), product.minPrice(), product.minSalePrice(), product.totalStock(),
                 product.primaryFileId(), support.publicUrl(product.primaryImageUrl()), product.createdAt());
     }
