@@ -78,10 +78,16 @@
     </select>
 
     <select id="listInactiveCreatedBefore" resultType="com.fss.backend.file.FileAsset">
-        SELECT id, path, status, created_at
-        FROM files
-        WHERE status = 'INACTIVE'
-          AND created_at &lt; #{cutoff}
+        SELECT f.id, f.path, f.status, f.created_at
+        FROM files f
+        WHERE f.status = 'INACTIVE'
+          AND f.created_at &lt; #{cutoff}
+          AND NOT EXISTS (SELECT 1 FROM product_images pi WHERE pi.file_id = f.id)
+          AND NOT EXISTS (SELECT 1 FROM product_variants pv WHERE pv.image_file_id = f.id)
+          AND NOT EXISTS (SELECT 1 FROM landing_banners lb WHERE lb.file_id = f.id)
+          AND NOT EXISTS (SELECT 1 FROM collections c WHERE c.file_id = f.id)
+          AND NOT EXISTS (SELECT 1 FROM blog_posts bp WHERE bp.cover_file_id = f.id)
+          AND NOT EXISTS (SELECT 1 FROM brands b WHERE b.file_id = f.id OR b.file_size_id = f.id)
     </select>
 
     <delete id="deleteById">
