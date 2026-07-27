@@ -6,7 +6,6 @@ import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.jsoup.Jsoup;
 import org.springframework.stereotype.Service;
 
-import java.net.URI;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -46,21 +45,6 @@ public class HtmlContentImageUsageService {
     }
 
     private String toFilePath(String src) {
-        if (src == null || src.isBlank()) {
-            return null;
-        }
-        if (src.startsWith("/files/")) {
-            return src.substring("/files/".length());
-        }
-        try {
-            URI uri = URI.create(src);
-            String path = uri.getPath();
-            if (path != null && path.startsWith("/files/")) {
-                return path.substring("/files/".length());
-            }
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-        return null;
+        return HtmlFilePathUtils.localFilePath(src);
     }
 }

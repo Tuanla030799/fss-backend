@@ -47,6 +47,33 @@ class HtmlSanitizerServiceTest {
     }
 
     @Test
+    void sanitizeShouldAllowAbsoluteLocalImageUrlsWithSpaces() {
+        HtmlSanitizerService localSanitizer = new HtmlSanitizerService("localhost", "/files");
+
+        String html = localSanitizer.sanitize("""
+                <p><img src="http://localhost:8080/files/2026-07-27/c60b717b-Screenshot from 2026-07-23.png"
+                        alt="" width="206" height="94"></p>
+                """);
+
+        assertTrue(html.contains("<img"));
+        assertTrue(html.contains("src=\"http://localhost:8080/files/2026-07-27/c60b717b-Screenshot from 2026-07-23.png\""));
+        assertTrue(html.contains("width=\"206\""));
+        assertTrue(html.contains("height=\"94\""));
+    }
+
+    @Test
+    void sanitizeShouldAllowAbsoluteLocalImageUrlsWithEncodedSpaces() {
+        HtmlSanitizerService localSanitizer = new HtmlSanitizerService("localhost", "/files");
+
+        String html = localSanitizer.sanitize("""
+                <p><img src="http://localhost:8080/files/2026-07-27/c60b717b-Screenshot%20from%202026-07-23.png"></p>
+                """);
+
+        assertTrue(html.contains("<img"));
+        assertTrue(html.contains("src=\"http://localhost:8080/files/2026-07-27/c60b717b-Screenshot%20from%202026-07-23.png\""));
+    }
+
+    @Test
     void sanitizeShouldRemoveUnsupportedImageSources() {
         String html = sanitizer.sanitize("<img src=\"data:image/png;base64,abc\"><img src=\"https://evil.example/a.png\">");
 

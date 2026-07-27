@@ -61,6 +61,22 @@ class FileServiceTest {
     }
 
     @Test
+    void uploadShouldEncodeSpacesInPublicUrl() throws Exception {
+        FileAssetRepository repository = mock(FileAssetRepository.class);
+        FileStorage storage = mock(FileStorage.class);
+        CurrentAdmin currentAdmin = mock(CurrentAdmin.class);
+        FileUrlService fileUrlService = new FileUrlService("/files");
+        FileService service = new FileService(repository, storage, currentAdmin, fileUrlService, 1600, 1600, 512000);
+        MockMultipartFile file = new MockMultipartFile("file", "Screenshot from 2026.png", "image/png", new byte[]{1, 2, 3});
+        when(storage.saveBytes(eq("Screenshot from 2026.png"), any(byte[].class)))
+                .thenReturn("2026-07-27/c60b717b-Screenshot from 2026.png");
+
+        Map<String, String> result = service.upload(file);
+
+        assertEquals("/files/2026-07-27/c60b717b-Screenshot%20from%202026.png", result.get("url"));
+    }
+
+    @Test
     void cleanupInactiveFilesShouldDeleteStorageAndRecord() throws Exception {
         FileAssetRepository repository = mock(FileAssetRepository.class);
         FileStorage storage = mock(FileStorage.class);

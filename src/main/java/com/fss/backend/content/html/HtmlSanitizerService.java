@@ -158,22 +158,7 @@ public class HtmlSanitizerService {
     }
 
     private boolean isAllowedImageSrc(String src) {
-        if (src == null || src.isBlank() || src.startsWith("data:")) {
-            return false;
-        }
-        if (src.startsWith("/files/")) {
-            return true;
-        }
-        try {
-            URI uri = URI.create(src);
-            String host = uri.getHost() == null ? null : uri.getHost().toLowerCase();
-            return ("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))
-                    && allowedImageHosts.contains(host)
-                    && uri.getPath() != null
-                    && uri.getPath().startsWith("/files/");
-        } catch (IllegalArgumentException ignored) {
-            return false;
-        }
+        return HtmlFilePathUtils.localFilePath(src, allowedImageHosts) != null;
     }
 
     private void removeUnsafeLink(Element link) {
