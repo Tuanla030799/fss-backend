@@ -5,15 +5,16 @@ Mục tiêu: giữ codebase dễ mở rộng khi thêm module/domain mới, như
 ## Nguyên tắc
 1. Controller chỉ nhận/trả HTTP và validate request.
 2. Service domain là API nghiệp vụ cho từng bounded context.
-3. Mỗi domain có controller, service, mapper interface và mapper XML riêng khi có persistence riêng.
-4. MyBatis mapper giữ phần SQL; XML mapper nằm trong `src/main/resources/mappers`.
-5. Schema thay đổi qua Flyway trong `src/main/resources/db/migration`.
+3. Mỗi domain có controller, service, `*Document` (record ánh xạ collection MongoDB) và `*Repository`
+   (truy vấn bằng `MongoTemplate`) khi có persistence riêng.
+4. Repository trả về record API cũ (`Brand`, `ProductSummary`, ...) để controller/service và JSON response không đổi.
+5. Index MongoDB khai báo tập trung trong `shared/mongo/MongoIndexInitializer`; không có migration dữ liệu khi boot.
 6. Package top-level thể hiện bounded context, không gom tất cả dưới `ecommerce`.
 
 ## Bounded Contexts
 - `auth`: đăng nhập admin, refresh token, JWT security.
 - `auth/account`: quản lý tài khoản admin.
-- `file`: upload, public URL, cleanup file tạm.
+- `file`: upload, xử lý ảnh, `FileStorage` (local/R2), public URL, cleanup file không dùng.
 - `catalog/category`: category record, request, controller, service, mapper.
 - `catalog/product`: product summary/detail, image, variant, request, controller, service, mapper.
 - `catalog/sku`: SKU record và request.
@@ -24,7 +25,9 @@ Mục tiêu: giữ codebase dễ mở rộng khi thêm module/domain mới, như
 - `shared`: request/helper dùng chung như `UpdateStatusRequest`, `EcommerceSupport`.
 
 ## Database
-- `V1__init_schema.sql`: baseline schema cho auth, file, catalog, sales, promotion, content.
-- `V2__seed_admin.sql`: seed admin mặc định.
+- MongoDB (replica set, có transaction). Chi tiết collection, index, transaction đơn hàng và vòng đời file:
+  [deploy-heroku-mongodb-r2.md](deploy-heroku-mongodb-r2.md).
+- Schema PostgreSQL cũ (các script Flyway V1–V18) được giữ trong `migration-tool/src/main/resources/legacy-schema`
+  làm tài liệu tham chiếu và cho test của công cụ chuyển dữ liệu.
 
 Project đã bỏ phần copy cũ như `preset/template` và `design_submissions`.

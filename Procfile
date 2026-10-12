@@ -1,0 +1,1 @@
+web: MALLOC_ARENA_MAX=2 java -Xmx${JVM_MAX_HEAP:-200m} -Xss512k -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=48m -XX:MaxDirectMemorySize=64m -XX:+ExitOnOutOfMemoryError $JAVA_OPTS -Dspring.profiles.active=${SPRING_PROFILES_ACTIVE:-heroku} -jar build/libs/app.jar
