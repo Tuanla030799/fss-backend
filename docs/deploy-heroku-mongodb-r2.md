@@ -131,9 +131,14 @@ checksum khi bắt buộc (các SDK mới mặc định gửi CRC mà R2 có th�
 dạng request với S3 giả lập; hãy smoke test với bucket thật sau khi cấu hình (mục 5).
 
 ## 4. Heroku
+Chọn region: Common Runtime của Heroku chỉ có `us` (Virginia) và `eu` (Ireland); các region châu Á (Tokyo, Singapore…)
+chỉ có ở Private Spaces (gói Enterprise, chi phí cao). Từ Việt Nam độ trễ tới cả hai đều khoảng 200–300 ms; đặt app
+`--region eu` và Atlas cùng chỗ (AWS `eu-west-1`, Ireland) để app ↔ DB < 5 ms. Ảnh đi qua Cloudflare (gần người dùng)
+nên không bị ảnh hưởng. Đo thực tế trước khi chốt: `curl -o /dev/null -w "%{time_connect}\n" https://<app>.herokuapp.com/api/health`.
+
 ```bash
 heroku login
-heroku create <app-name>            # hoặc dùng app có sẵn
+heroku create <app-name> --region eu # region không đổi được sau khi tạo
 heroku stack                        # dùng stack hiện hành mặc định
 heroku buildpacks:set heroku/gradle # Heroku tự nhận Gradle; lệnh này để chắc chắn
 
@@ -205,6 +210,36 @@ export UPLOAD_DIR=/opt/fds-backend/uploads R2_ENDPOINT=... R2_BUCKET=... R2_ACCE
 - Chạy lại `migrate-db` sau khi API đã nhận dữ liệu mới sẽ ghi đè các document trùng id bằng bản PostgreSQL — chỉ
   chạy trước khi chuyển hẳn.
 - Độ chính xác thời gian giảm từ micro giây (PostgreSQL) xuống mili giây (BSON Date).
+
+### 6b. Chuyển từ file backup (dump PostgreSQL + file zip ảnh)
+Không cần VM cũ còn chạy; làm trên máy cá nhân có Docker và JDK 21.
+
+```bash
+# 1. Dựng PostgreSQL tạm và khôi phục backup (dump dạng -Fc của scripts/backup-prod.sh)
+docker run -d --name legacy-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=fss -p 5433:5432 postgres:16-alpine
+docker cp fss_db.dump legacy-pg:/tmp/fss_db.dump
+docker exec legacy-pg pg_restore -U postgres -d fss --no-owner --no-privileges /tmp/fss_db.dump
+#    (nếu backup là file .sql thuần: docker exec -i legacy-pg psql -U postgres -d fss < backup.sql)
+
+# 2. Giải nén ảnh. Bên trong phải là <thư mục>/<yyyy-MM-dd>/<tên file> đúng như cột files.path
+unzip uploads.zip -d legacy && ls legacy        # ví dụ legacy/uploads/2026-06-01/...
+
+# 3. Tối ưu ảnh sang thư mục mới (giữ nguyên đường dẫn và đuôi file; file gốc không bị sửa)
+./gradlew :migration-tool:run --args="optimize-files --source-dir $PWD/legacy/uploads --target-dir $PWD/legacy/optimized --dry-run"
+./gradlew :migration-tool:run --args="optimize-files --source-dir $PWD/legacy/uploads --target-dir $PWD/legacy/optimized"
+
+# 4. Chuyển DB và đẩy ảnh đã tối ưu lên R2
+export PG_URL=jdbc:postgresql://localhost:5433/fss PG_USER=postgres PG_PASSWORD=postgres
+export MONGODB_URI='mongodb+srv://...' MONGODB_DATABASE=fss
+./gradlew :migration-tool:run --args="migrate-db"
+./gradlew :migration-tool:run --args="verify"
+export UPLOAD_DIR=$PWD/legacy/optimized R2_ENDPOINT=... R2_BUCKET=... R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=...
+./gradlew :migration-tool:run --args="sync-files"
+```
+`optimize-files` áp dụng cùng quy tắc với API upload: giữ tỉ lệ, không phóng to, tối đa 1600×1600 (`--max-size`),
+xoay theo EXIF, bỏ EXIF/GPS, JPEG chất lượng 0.85 (`--quality`). JPEG/PNG giữ nguyên định dạng (đuôi file trong DB vẫn
+đúng); file không cần xử lý mà nén lại bị to hơn thì giữ bản gốc. GIF, WebP, HEIC hoặc file lỗi được copy nguyên và
+liệt kê trong báo cáo. Giữ lại zip gốc làm bản lưu trữ.
 
 ## 7. Rollback
 - **Code trên Heroku:** `heroku releases` → `heroku rollback v<N>` (quay về release trước, giữ config vars).

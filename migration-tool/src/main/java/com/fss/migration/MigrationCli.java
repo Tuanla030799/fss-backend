@@ -28,6 +28,8 @@ import java.util.List;
  *   migrate-db   copy PostgreSQL -> MongoDB (idempotent upserts, PostgreSQL read-only)   [--dry-run]
  *   verify       compare counts/totals between PostgreSQL and MongoDB (read-only)
  *   sync-files   copy uploads/ -> R2 files/ and switch metadata to r2 (idempotent)      [--dry-run]
+ *   optimize-files  resize/rotate/strip metadata of legacy uploads into a new directory,
+ *                   keeping every relative path (run before sync-files)                 [--dry-run]
  * </pre>
  * Connection settings come from options or environment variables: PG_URL, PG_USER, PG_PASSWORD, MONGODB_URI,
  * MONGODB_DATABASE, UPLOAD_DIR, R2_ENDPOINT, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY.
@@ -41,8 +43,9 @@ public final class MigrationCli {
     }
 
     public static int run(String[] argv) throws Exception {
-        if (argv.length == 0 || !List.of("migrate-db", "verify", "sync-files").contains(argv[0])) {
-            System.err.println("Usage: migration-tool <migrate-db|verify|sync-files> [options]\n"
+        if (argv.length == 0 || !List.of("migrate-db", "verify", "sync-files", "optimize-files").contains(argv[0])) {
+            System.err.println("Usage: migration-tool <migrate-db|verify|sync-files|optimize-files> [options]\n"
+                    + "  optimize-files --source-dir ./uploads --target-dir ./uploads-optimized [--max-size 1600] [--quality 0.85]\n"
                     + "  --pg-url jdbc:postgresql://host:5432/fss --pg-user u --pg-password p\n"
                     + "  --mongo-uri mongodb+srv://... --mongo-db fss\n"
                     + "  --upload-dir ./uploads --r2-endpoint https://<account>.r2.cloudflarestorage.com --r2-bucket b\n"
@@ -52,6 +55,13 @@ public final class MigrationCli {
         }
         Args args = new Args(argv, 1);
         boolean dryRun = args.flag("dry-run");
+        if (argv[0].equals("optimize-files")) {
+            String maxSize = args.get("max-size", null);
+            String quality = args.get("quality", null);
+            return new ImageOptimizer(Path.of(args.require("source-dir", null)), Path.of(args.require("target-dir", null)),
+                    maxSize == null ? 1600 : Integer.parseInt(maxSize), quality == null ? 0.85f : Float.parseFloat(quality),
+                    dryRun).run();
+        }
         try (MongoClient client = mongoClient(args.require("mongo-uri", "MONGODB_URI"))) {
             MongoDatabase mongo = client.getDatabase(args.get("mongo-db", "MONGODB_DATABASE") == null ? "fss"
                     : args.get("mongo-db", "MONGODB_DATABASE"));
