@@ -3,53 +3,68 @@ package com.fss.backend.file;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDate;
-import java.util.UUID;
+import java.nio.file.StandardCopyOption;
 
+/**
+ * Local-disk storage for development (and the legacy VM deployment). Never use it on Heroku: the dyno filesystem
+ * is ephemeral and is wiped on every restart/deploy.
+ */
 @Component
+@ConditionalOnProperty(name = "app.storage.provider", havingValue = "local", matchIfMissing = true)
 public class LocalFileStorage implements FileStorage {
     private static final Logger log = LoggerFactory.getLogger(LocalFileStorage.class);
 
     private final Path uploadRoot;
 
-    public LocalFileStorage(@Value("${app.upload-dir}") String uploadDir) {
-        this.uploadRoot = Path.of(uploadDir);
-        log.info("File upload root configured path={}", this.uploadRoot.toAbsolutePath().normalize());
-    }
-
-    @Override
-    public String save(MultipartFile file) throws IOException {
-        return saveBytes(file.getOriginalFilename(), file.getBytes());
-    }
-
-    @Override
-    public String saveBytes(String originalFilename, byte[] bytes) throws IOException {
-        String dateFolder = LocalDate.now().toString();
-        Path targetDir = uploadRoot.resolve(dateFolder);
-        if (Files.notExists(targetDir)) {
-            Files.createDirectories(targetDir);
+    public LocalFileStorage(@Value("${app.upload-dir}") String uploadDir,
+                            @Value("${app.storage.allow-local:true}") boolean allowLocal) {
+        if (!allowLocal) {
+            throw new IllegalStateException("STORAGE_PROVIDER=local is not allowed in this environment (ephemeral disk); use r2");
         }
-        String clean = StringUtils.cleanPath(originalFilename == null || originalFilename.isBlank() ? "upload.bin" : originalFilename);
-        String name = UUID.randomUUID() + "-" + clean;
-        Path target = targetDir.resolve(name);
-        Files.write(target, bytes);
-        log.info("File stored path={} size={}", target.toAbsolutePath(), bytes.length);
-        return dateFolder + "/" + name;
+        this.uploadRoot = Path.of(uploadDir).toAbsolutePath().normalize();
+        log.info("File storage provider=local root={}", this.uploadRoot);
     }
 
     @Override
-    public void delete(String relativePath) throws IOException {
-        Path target = uploadRoot.resolve(relativePath).normalize();
-        if (!target.startsWith(uploadRoot.normalize())) {
-            return;
+    public String provider() {
+        return "local";
+    }
+
+    @Override
+    public String objectKey(String relativePath) {
+        return relativePath;
+    }
+
+    @Override
+    public void put(String objectKey, byte[] bytes, String contentType) throws IOException {
+        Path target = resolve(objectKey);
+        Files.createDirectories(target.getParent());
+        Path temp = Files.createTempFile(target.getParent(), ".upload-", ".tmp");
+        try {
+            Files.write(temp, bytes);
+            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } finally {
+            Files.deleteIfExists(temp);
         }
-        Files.deleteIfExists(target);
+        log.info("File stored provider=local key={} size={}", objectKey, bytes.length);
+    }
+
+    @Override
+    public void delete(String objectKey) throws IOException {
+        Files.deleteIfExists(resolve(objectKey));
+    }
+
+    private Path resolve(String objectKey) throws IOException {
+        Path target = uploadRoot.resolve(objectKey).normalize();
+        if (!target.startsWith(uploadRoot)) {
+            throw new IOException("Invalid object key");
+        }
+        return target;
     }
 }

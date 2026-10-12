@@ -30,7 +30,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getServletPath();
+        // Request URI (not servlet path) so the check does not depend on how the dispatcher servlet is mapped.
+        String path = request.getRequestURI().substring(request.getContextPath().length());
         return path.startsWith(ADMIN_AUTH_PATH) || !path.startsWith(ADMIN_PATH);
     }
 

@@ -37,8 +37,11 @@ public class EcommerceSupport {
 
     public void activateFile(UUID fileId) {
         if (fileId == null) return;
-        require(fileAssetRepository.findById(fileId) != null, "File not found: " + fileId);
-        fileAssetRepository.updateStatus(fileId, ACTIVE, adminId());
+        switch (fileAssetRepository.activate(fileId, adminId())) {
+            case NOT_FOUND -> throw new ApiException("File not found: " + fileId);
+            case UNAVAILABLE -> throw new ApiException("File is no longer available, please re-upload: " + fileId);
+            default -> { }
+        }
     }
 
     public String publicUrl(String path) {

@@ -1,6 +1,6 @@
 package com.fss.backend.content.collection;
 
-import com.fss.backend.catalog.product.ProductMapper;
+import com.fss.backend.catalog.product.ProductRepository;
 import com.fss.backend.catalog.product.ProductSummary;
 import com.fss.backend.common.PageResult;
 import com.fss.backend.content.html.HtmlContentImageUsageService;
@@ -15,19 +15,19 @@ import java.util.UUID;
 
 @Service
 public class ProductCollectionService {
-    private final ProductCollectionMapper mapper;
-    private final ProductMapper productMapper;
+    private final ProductCollectionRepository repository;
+    private final ProductRepository productRepository;
     private final EcommerceSupport support;
     private final HtmlSanitizerService htmlSanitizerService;
     private final HtmlContentImageUsageService htmlContentImageUsageService;
     private final FileReferenceService fileReferenceService;
 
-    public ProductCollectionService(ProductCollectionMapper mapper, ProductMapper productMapper, EcommerceSupport support,
+    public ProductCollectionService(ProductCollectionRepository repository, ProductRepository productRepository, EcommerceSupport support,
                                     HtmlSanitizerService htmlSanitizerService,
                                     HtmlContentImageUsageService htmlContentImageUsageService,
                                     FileReferenceService fileReferenceService) {
-        this.mapper = mapper;
-        this.productMapper = productMapper;
+        this.repository = repository;
+        this.productRepository = productRepository;
         this.support = support;
         this.htmlSanitizerService = htmlSanitizerService;
         this.htmlContentImageUsageService = htmlContentImageUsageService;
@@ -36,25 +36,25 @@ public class ProductCollectionService {
 
     public PageResult<ProductCollection> listPublicCollections(String keyword, int page, int limit) {
         int safeLimit = support.safeLimit(limit);
-        List<ProductCollection> items = mapper.listCollections(true, null, keyword, safeLimit, support.offset(page, safeLimit))
+        List<ProductCollection> items = repository.listCollections(true, null, keyword, safeLimit, support.offset(page, safeLimit))
                 .stream().map(this::withCollectionUrl).toList();
-        return support.pageResult(items, page, safeLimit, mapper.countCollections(true, null, keyword));
+        return support.pageResult(items, page, safeLimit, repository.countCollections(true, null, keyword));
     }
 
     public ProductCollectionDetail getPublicCollection(String slug, int page, int limit) {
-        return collectionDetail(mapper.findCollectionBySlug(slug, true), true, page, limit);
+        return collectionDetail(repository.findCollectionBySlug(slug, true), true, page, limit);
     }
 
     public PageResult<ProductCollection> listAdminCollections(String status, String keyword, int page, int limit) {
         String normalizedStatus = support.normalizeStatusNullable(status);
         int safeLimit = support.safeLimit(limit);
-        List<ProductCollection> items = mapper.listCollections(false, normalizedStatus, keyword, safeLimit, support.offset(page, safeLimit))
+        List<ProductCollection> items = repository.listCollections(false, normalizedStatus, keyword, safeLimit, support.offset(page, safeLimit))
                 .stream().map(this::withCollectionUrl).toList();
-        return support.pageResult(items, page, safeLimit, mapper.countCollections(false, normalizedStatus, keyword));
+        return support.pageResult(items, page, safeLimit, repository.countCollections(false, normalizedStatus, keyword));
     }
 
     public ProductCollectionDetail getAdminCollection(UUID id) {
-        return collectionDetail(mapper.findCollectionById(id), false, 1, 100);
+        return collectionDetail(repository.findCollectionById(id), false, 1, 100);
     }
 
     @Transactional
@@ -63,37 +63,35 @@ public class ProductCollectionService {
         support.activateFile(request.fileId());
         String excerpt = collectionExcerpt(request);
         String descriptionHtml = sanitizeCollectionDescription(request);
-        mapper.insertCollection(id, request.name().trim(), uniqueSlug(request.slug(), request.name(), null),
-                excerpt, descriptionHtml, request.fileId(),
+        repository.insertCollection(id, request.name().trim(), uniqueSlug(request.slug(), request.name(), null),
+                excerpt, descriptionHtml, htmlContentImageUsageService.filePathList(descriptionHtml), request.fileId(),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
-                support.nz(request.sortOrder()), support.adminId());
+                support.nz(request.sortOrder()), members(request.products()), support.adminId());
         htmlContentImageUsageService.activateImages(descriptionHtml);
-        replaceProducts(id, request.products());
         return id;
     }
 
     @Transactional
     public void updateCollection(UUID id, ProductCollectionRequest request) {
-        ProductCollection existing = mapper.findCollectionById(id);
+        ProductCollection existing = repository.findCollectionById(id);
         support.require(existing != null, "Collection not found");
         support.activateFile(request.fileId());
         String excerpt = collectionExcerpt(request);
         String descriptionHtml = sanitizeCollectionDescription(request);
-        mapper.updateCollection(id, request.name().trim(), uniqueSlug(request.slug(), request.name(), id),
-                excerpt, descriptionHtml, request.fileId(),
+        repository.updateCollection(id, request.name().trim(), uniqueSlug(request.slug(), request.name(), id),
+                excerpt, descriptionHtml, htmlContentImageUsageService.filePathList(descriptionHtml), request.fileId(),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
-                support.nz(request.sortOrder()), support.adminId());
+                support.nz(request.sortOrder()), members(request.products()), support.adminId());
         htmlContentImageUsageService.activateImages(descriptionHtml);
-        replaceProducts(id, request.products());
         fileReferenceService.releaseFile(existing.fileId());
         fileReferenceService.releaseRemovedHtmlImages(existing.descriptionHtml(), descriptionHtml);
     }
 
     @Transactional
     public void deleteCollection(UUID id) {
-        ProductCollection existing = mapper.findCollectionById(id);
+        ProductCollection existing = repository.findCollectionById(id);
         support.require(existing != null, "Collection not found");
-        mapper.softDeleteCollection(id, support.adminId());
+        repository.softDeleteCollection(id, support.adminId());
         fileReferenceService.releaseFile(existing.fileId());
         fileReferenceService.releaseRemovedHtmlImages(existing.descriptionHtml(), null);
     }
@@ -102,10 +100,10 @@ public class ProductCollectionService {
         support.require(collection != null, "Collection not found");
         ProductCollection normalized = withCollectionUrl(collection);
         int safeLimit = support.safeLimit(limit);
-        List<ProductSummary> products = mapper.listCollectionProducts(collection.id(), publicOnly, safeLimit, support.offset(page, safeLimit))
+        List<ProductSummary> products = repository.listCollectionProducts(collection.id(), publicOnly, safeLimit, support.offset(page, safeLimit))
                 .stream().map(this::withProductUrl).toList();
         PageResult<ProductSummary> pagedProducts = support.pageResult(products, page, safeLimit,
-                mapper.countCollectionProducts(collection.id(), publicOnly));
+                repository.countCollectionProducts(collection.id(), publicOnly));
         return new ProductCollectionDetail(normalized.id(), normalized.name(), normalized.slug(),
                 normalized.excerpt(), normalized.descriptionHtml(),
                 normalized.fileId(), normalized.imageUrl(), normalized.status(),
@@ -120,24 +118,30 @@ public class ProductCollectionService {
         return htmlSanitizerService.sanitize(request.descriptionHtml());
     }
 
-    private void replaceProducts(UUID collectionId, List<CollectionProductRequest> products) {
-        mapper.deleteCollectionProducts(collectionId);
-        if (products == null) return;
+    /** Old behavior: rows were (collection, product) unique and a repeated product kept the last sortOrder. */
+    private List<CollectionDocument.Member> members(List<CollectionProductRequest> products) {
+        if (products == null) return List.of();
+        java.util.LinkedHashMap<UUID, CollectionDocument.Member> members = new java.util.LinkedHashMap<>();
+        java.time.Instant now = java.time.Instant.now();
         for (CollectionProductRequest product : products) {
-            support.require(productMapper.findProductSummaryById(product.productId()) != null, "Product not found: " + product.productId());
-            mapper.insertCollectionProduct(collectionId, product.productId(), support.nz(product.sortOrder()));
+            support.require(productRepository.existsLive(product.productId()), "Product not found: " + product.productId());
+            CollectionDocument.Member previous = members.get(product.productId());
+            members.put(product.productId(), new CollectionDocument.Member(product.productId(), support.nz(product.sortOrder()),
+                    previous == null ? now : previous.createdAt()));
         }
+        return List.copyOf(members.values());
     }
 
     private String uniqueSlug(String slug, String name, UUID exclude) {
         String normalized = support.uniqueSlug(slug, name);
-        support.require(mapper.countCollectionSlug(normalized, exclude) == 0, "Collection slug already exists");
+        support.require(!repository.slugExists(normalized, exclude), "Collection slug already exists");
         return normalized;
     }
 
     private ProductCollection withCollectionUrl(ProductCollection collection) {
-        return collection == null || collection.imageUrl() == null ? collection : new ProductCollection(collection.id(),
-                collection.name(), collection.slug(), collection.excerpt(), collection.descriptionHtml(),
+        return collection == null ? null : new ProductCollection(collection.id(),
+                collection.name(), collection.slug(), collection.excerpt(),
+                htmlContentImageUsageService.rewriteForOutput(collection.descriptionHtml()),
                 collection.fileId(), support.publicUrl(collection.imageUrl()), collection.status(), collection.sortOrder(),
                 collection.productCount(), collection.createdAt());
     }

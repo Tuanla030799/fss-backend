@@ -11,25 +11,25 @@ import java.util.UUID;
 
 @Service
 public class BrandService {
-    private final BrandMapper mapper;
+    private final BrandRepository repository;
     private final EcommerceSupport support;
     private final FileReferenceService fileReferenceService;
 
-    public BrandService(BrandMapper mapper, EcommerceSupport support, FileReferenceService fileReferenceService) {
-        this.mapper = mapper;
+    public BrandService(BrandRepository repository, EcommerceSupport support, FileReferenceService fileReferenceService) {
+        this.repository = repository;
         this.support = support;
         this.fileReferenceService = fileReferenceService;
     }
 
     public PageResult<Brand> listPublicBrands(String keyword, int page, int limit) {
         int safeLimit = support.safeLimit(limit);
-        List<Brand> items = mapper.listBrands(EcommerceSupport.ACTIVE, keyword, safeLimit, support.offset(page, safeLimit))
+        List<Brand> items = repository.listBrands(EcommerceSupport.ACTIVE, keyword, safeLimit, support.offset(page, safeLimit))
                 .stream().map(this::withBrandUrl).toList();
-        return support.pageResult(items, page, safeLimit, mapper.countBrands(EcommerceSupport.ACTIVE, keyword));
+        return support.pageResult(items, page, safeLimit, repository.countBrands(EcommerceSupport.ACTIVE, keyword));
     }
 
     public Brand getPublicBrand(String slug) {
-        Brand brand = mapper.findBrandBySlug(slug);
+        Brand brand = repository.findBrandBySlug(slug);
         support.require(brand != null && EcommerceSupport.ACTIVE.equals(brand.status()), "Brand not found");
         return withBrandUrl(brand);
     }
@@ -37,13 +37,13 @@ public class BrandService {
     public PageResult<Brand> listAdminBrands(String status, String keyword, int page, int limit) {
         String normalizedStatus = support.normalizeStatusNullable(status);
         int safeLimit = support.safeLimit(limit);
-        List<Brand> items = mapper.listBrands(normalizedStatus, keyword, safeLimit, support.offset(page, safeLimit))
+        List<Brand> items = repository.listBrands(normalizedStatus, keyword, safeLimit, support.offset(page, safeLimit))
                 .stream().map(this::withBrandUrl).toList();
-        return support.pageResult(items, page, safeLimit, mapper.countBrands(normalizedStatus, keyword));
+        return support.pageResult(items, page, safeLimit, repository.countBrands(normalizedStatus, keyword));
     }
 
     public Brand getAdminBrand(UUID id) {
-        Brand brand = mapper.findBrandById(id);
+        Brand brand = repository.findBrandById(id);
         support.require(brand != null, "Brand not found");
         return withBrandUrl(brand);
     }
@@ -53,7 +53,7 @@ public class BrandService {
         UUID id = UUID.randomUUID();
         support.activateFile(request.fileId());
         support.activateFile(request.fileSizeId());
-        mapper.insertBrand(id, request.name().trim(), uniqueSlug(request.slug(), request.name(), null),
+        repository.insertBrand(id, request.name().trim(), uniqueSlug(request.slug(), request.name(), null),
                 request.description(), request.fileId(), request.fileSizeId(),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
                 support.nz(request.sortOrder()), support.adminId());
@@ -62,11 +62,11 @@ public class BrandService {
 
     @Transactional
     public void updateBrand(UUID id, BrandRequest request) {
-        Brand existing = mapper.findBrandById(id);
+        Brand existing = repository.findBrandById(id);
         support.require(existing != null, "Brand not found");
         support.activateFile(request.fileId());
         support.activateFile(request.fileSizeId());
-        mapper.updateBrand(id, request.name().trim(), uniqueSlug(request.slug(), request.name(), id),
+        repository.updateBrand(id, request.name().trim(), uniqueSlug(request.slug(), request.name(), id),
                 request.description(), request.fileId(), request.fileSizeId(),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
                 support.nz(request.sortOrder()), support.adminId());
@@ -76,16 +76,16 @@ public class BrandService {
 
     @Transactional
     public void deleteBrand(UUID id) {
-        Brand existing = mapper.findBrandById(id);
+        Brand existing = repository.findBrandById(id);
         support.require(existing != null, "Brand not found");
-        mapper.softDeleteBrand(id, support.adminId());
+        repository.softDeleteBrand(id, support.adminId());
         fileReferenceService.releaseFile(existing.fileId());
         fileReferenceService.releaseFile(existing.fileSizeId());
     }
 
     private String uniqueSlug(String slug, String name, UUID exclude) {
         String normalized = support.uniqueSlug(slug, name);
-        support.require(mapper.countBrandSlug(normalized, exclude) == 0, "Brand slug already exists");
+        support.require(!repository.slugExists(normalized, exclude), "Brand slug already exists");
         return normalized;
     }
 

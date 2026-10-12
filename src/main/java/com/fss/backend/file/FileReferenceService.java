@@ -10,16 +10,20 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+/** Marks files INACTIVE when the last live reference goes away; the cleanup job deletes them after the TTL. */
 @Service
 public class FileReferenceService {
     private final FileAssetRepository fileAssetRepository;
+    private final FileUsageIndex usageIndex;
     private final EcommerceSupport support;
     private final HtmlContentImageUsageService htmlContentImageUsageService;
 
     public FileReferenceService(FileAssetRepository fileAssetRepository,
+                                FileUsageIndex usageIndex,
                                 EcommerceSupport support,
                                 HtmlContentImageUsageService htmlContentImageUsageService) {
         this.fileAssetRepository = fileAssetRepository;
+        this.usageIndex = usageIndex;
         this.support = support;
         this.htmlContentImageUsageService = htmlContentImageUsageService;
     }
@@ -60,8 +64,8 @@ public class FileReferenceService {
     }
 
     private void deactivateIfUnused(FileAsset file) {
-        if (fileAssetRepository.countActiveReferences(file.id(), file.path()) == 0) {
-            fileAssetRepository.updateStatus(file.id(), EcommerceSupport.INACTIVE, support.adminId());
+        if (FileStatus.ACTIVE.equals(file.status()) && !usageIndex.hasActiveReferences(file.id(), file.path())) {
+            fileAssetRepository.deactivate(file.id(), support.adminId());
         }
     }
 }

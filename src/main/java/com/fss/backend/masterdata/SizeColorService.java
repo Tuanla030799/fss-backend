@@ -10,11 +10,11 @@ import java.util.UUID;
 
 @Service
 public class SizeColorService {
-    private final SizeColorMapper mapper;
+    private final SizeColorRepository repository;
     private final EcommerceSupport support;
 
-    public SizeColorService(SizeColorMapper mapper, EcommerceSupport support) {
-        this.mapper = mapper;
+    public SizeColorService(SizeColorRepository repository, EcommerceSupport support) {
+        this.repository = repository;
         this.support = support;
     }
 
@@ -22,12 +22,12 @@ public class SizeColorService {
         String normalizedStatus = support.normalizeStatusNullable(status);
         String normalizedKeyword = support.trimToNull(keyword);
         int safeLimit = support.safeLimit(limit);
-        List<SizeOption> items = mapper.listSizes(normalizedStatus, normalizedKeyword, safeLimit, support.offset(page, safeLimit));
-        return support.pageResult(items, page, safeLimit, mapper.countSizes(normalizedStatus, normalizedKeyword));
+        List<SizeOption> items = repository.listSizes(normalizedStatus, normalizedKeyword, safeLimit, support.offset(page, safeLimit));
+        return support.pageResult(items, page, safeLimit, repository.countSizes(normalizedStatus, normalizedKeyword));
     }
 
     public SizeOption getSize(UUID id) {
-        SizeOption size = mapper.findSizeById(id);
+        SizeOption size = repository.findSizeById(id);
         support.require(size != null, "Size not found");
         return size;
     }
@@ -36,8 +36,8 @@ public class SizeColorService {
     public UUID createSize(SizeRequest request) {
         UUID id = UUID.randomUUID();
         String value = support.trimRequired(request.value(), "Size");
-        support.require(mapper.countSizeValue(value, null) == 0, "Size already exists");
-        mapper.insertSize(id, value, support.def(support.trimToNull(request.label()), value),
+        support.require(!repository.sizeValueExists(value, null), "Size already exists");
+        repository.insertSize(id, value, support.def(support.trimToNull(request.label()), value),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
                 support.nz(request.sortOrder()), support.adminId());
         return id;
@@ -45,30 +45,30 @@ public class SizeColorService {
 
     @Transactional
     public void updateSize(UUID id, SizeRequest request) {
-        support.require(mapper.findSizeById(id) != null, "Size not found");
+        support.require(repository.findSizeById(id) != null, "Size not found");
         String value = support.trimRequired(request.value(), "Size");
-        support.require(mapper.countSizeValue(value, id) == 0, "Size already exists");
-        mapper.updateSize(id, value, support.def(support.trimToNull(request.label()), value),
+        support.require(!repository.sizeValueExists(value, id), "Size already exists");
+        repository.updateSize(id, value, support.def(support.trimToNull(request.label()), value),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
                 support.nz(request.sortOrder()), support.adminId());
     }
 
     @Transactional
     public void deleteSize(UUID id) {
-        support.require(mapper.findSizeById(id) != null, "Size not found");
-        mapper.softDeleteSize(id, support.adminId());
+        support.require(repository.findSizeById(id) != null, "Size not found");
+        repository.softDeleteSize(id, support.adminId());
     }
 
     public PageResult<ColorOption> listColors(String status, String keyword, int page, int limit) {
         String normalizedStatus = support.normalizeStatusNullable(status);
         String normalizedKeyword = support.trimToNull(keyword);
         int safeLimit = support.safeLimit(limit);
-        List<ColorOption> items = mapper.listColors(normalizedStatus, normalizedKeyword, safeLimit, support.offset(page, safeLimit));
-        return support.pageResult(items, page, safeLimit, mapper.countColors(normalizedStatus, normalizedKeyword));
+        List<ColorOption> items = repository.listColors(normalizedStatus, normalizedKeyword, safeLimit, support.offset(page, safeLimit));
+        return support.pageResult(items, page, safeLimit, repository.countColors(normalizedStatus, normalizedKeyword));
     }
 
     public ColorOption getColor(UUID id) {
-        ColorOption color = mapper.findColorById(id);
+        ColorOption color = repository.findColorById(id);
         support.require(color != null, "Color not found");
         return color;
     }
@@ -77,8 +77,8 @@ public class SizeColorService {
     public UUID createColor(ColorRequest request) {
         UUID id = UUID.randomUUID();
         String name = support.trimRequired(request.name(), "Color name");
-        support.require(mapper.countColorName(name, null) == 0, "Color already exists");
-        mapper.insertColor(id, name, support.trimToNull(request.colorCode()),
+        support.require(!repository.colorNameExists(name, null), "Color already exists");
+        repository.insertColor(id, name, support.trimToNull(request.colorCode()),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
                 support.nz(request.sortOrder()), support.adminId());
         return id;
@@ -86,17 +86,17 @@ public class SizeColorService {
 
     @Transactional
     public void updateColor(UUID id, ColorRequest request) {
-        support.require(mapper.findColorById(id) != null, "Color not found");
+        support.require(repository.findColorById(id) != null, "Color not found");
         String name = support.trimRequired(request.name(), "Color name");
-        support.require(mapper.countColorName(name, id) == 0, "Color already exists");
-        mapper.updateColor(id, name, support.trimToNull(request.colorCode()),
+        support.require(!repository.colorNameExists(name, id), "Color already exists");
+        repository.updateColor(id, name, support.trimToNull(request.colorCode()),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
                 support.nz(request.sortOrder()), support.adminId());
     }
 
     @Transactional
     public void deleteColor(UUID id) {
-        support.require(mapper.findColorById(id) != null, "Color not found");
-        mapper.softDeleteColor(id, support.adminId());
+        support.require(repository.findColorById(id) != null, "Color not found");
+        repository.softDeleteColor(id, support.adminId());
     }
 }

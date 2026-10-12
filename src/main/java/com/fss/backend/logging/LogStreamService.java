@@ -76,6 +76,10 @@ public class LogStreamService {
     private void stream(SseEmitter emitter, AtomicBoolean open, int initialLines) {
         try {
             send(emitter, "ready", currentLogFile.getFileName().toString());
+            if (!Files.exists(currentLogFile)) {
+                // File logging is disabled (e.g. Heroku logs to stdout only): use `heroku logs --tail` instead.
+                send(emitter, "log", "File logging is disabled on this deployment; use the platform log stream.");
+            }
             for (String line : tailLines(initialLines)) {
                 send(emitter, "log", line);
             }

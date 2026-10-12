@@ -13,3 +13,6 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = 'fss-backend'
+
+// One-off PostgreSQL -> MongoDB / uploads -> R2 migration CLI. Not part of the deployed jar.
+include 'migration-tool'
