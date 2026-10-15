@@ -1,3 +1,5 @@
+# Legacy VM deployment. The API now uses MongoDB (MONGODB_URI); the PostgreSQL service is kept only so the
+# existing backup/restore scripts and the PostgreSQL -> MongoDB migration can read the old data.
 services:
   db:
     image: postgres:16-alpine
@@ -24,16 +26,17 @@ services:
   api:
     build: .
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
     env_file:
       - .env.production
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
-      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
-      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
-      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+      MONGODB_URI: ${MONGODB_URI}
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
+      R2_ENDPOINT: ${R2_ENDPOINT:-}
+      R2_BUCKET: ${R2_BUCKET:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_PUBLIC_BASE_URL: ${R2_PUBLIC_BASE_URL:-}
       APP_JWT_SECRET: ${APP_JWT_SECRET}
       APP_JWT_ACCESS_TOKEN_MINUTES: ${APP_JWT_ACCESS_TOKEN_MINUTES:-30}
       APP_JWT_REFRESH_TOKEN_DAYS: ${APP_JWT_REFRESH_TOKEN_DAYS:-30}

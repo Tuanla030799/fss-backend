@@ -1,123 +1,95 @@
 # FSS Backend
 
-Spring Boot backend cho auth, file upload và ecommerce. Project dùng Java 21, MyBatis XML, Flyway và PostgreSQL.
+Spring Boot backend (Java 21, Spring Boot 3.3.5) cho auth, upload ảnh và ecommerce.
+
+- **Database:** MongoDB (Spring Data MongoDB, transaction qua replica set — MongoDB Atlas trên production).
+- **Ảnh:** Cloudflare R2 qua S3-compatible API (local disk chỉ dùng khi phát triển).
+- **Deploy:** Heroku (Gradle buildpack, dyno 512 MB).
+
+Hướng dẫn triển khai đầy đủ (MongoDB Atlas, Cloudflare R2, Heroku, chuyển dữ liệu, rollback):
+[docs/deploy-heroku-mongodb-r2.md](docs/deploy-heroku-mongodb-r2.md).
 
 ## Module chính
-- `auth`: admin auth, JWT, refresh token.
-- `auth/account`: admin account management cho phần quản trị.
-- `file`: upload, public file URL, cleanup file tạm.
-- `catalog/category`: category model/request/controller/service/mapper.
-- `catalog/product`: product, image, variant model/request/controller/service/mapper.
-- `catalog/sku`: SKU model/request và dữ liệu phục vụ đặt hàng.
-- `sales/order`: order, payment/shipping status, status history, controller/service/mapper.
-- `promotion/coupon`: coupon validation và CRUD payload/controller/service/mapper.
-- `content/banner`: landing banner payload/controller/service/mapper.
-- `customer`: customer user management.
-- `shared`: request/helper dùng chung.
-
-## Công nghệ
-- Java 21
-- Spring Boot 3.3
-- MyBatis XML
-- Flyway
-- PostgreSQL 16
-- Gradle
+- `auth`, `auth/account`: admin auth (JWT access token + refresh token), quản lý tài khoản admin.
+- `file`: upload ảnh, xử lý ảnh, metadata file, lưu trữ local/R2, dọn file không dùng.
+- `catalog/category|brand|product|sku`, `masterdata` (size/màu).
+- `sales/order`, `promotion/coupon`, `customer`.
+- `content/banner|blog|collection|html` (HTML TinyMCE đã sanitize, theo dõi ảnh trong HTML).
+- `shared/mongo`: cấu hình MongoDB, index, seed master data, transaction runner.
+- `migration-tool/` (Gradle subproject, **không** nằm trong jar deploy): chuyển PostgreSQL cũ → MongoDB và `uploads/` → R2.
 
 ## Chạy local
+
+Yêu cầu: JDK 21, Docker.
+
 ```bash
-docker compose up -d db
-./gradlew bootRun
+docker compose up -d mongo      # MongoDB 7, single-node replica set rs0 (cần cho transaction)
+./gradlew bootRun               # API ở http://localhost:8080, ảnh lưu ./uploads, phục vụ tại /files/**
 ```
 
-API chạy mặc định ở `http://localhost:8080`.
+Mặc định local: `MONGODB_URI=mongodb://localhost:27017/fss?replicaSet=rs0&directConnection=true`, `STORAGE_PROVIDER=local`,
+đăng ký admin công khai bật (`POST /api/admin/auth/register`) để tạo tài khoản đầu tiên. Có thể thay bằng
+`APP_BOOTSTRAP_ADMIN_EMAIL` + `APP_BOOTSTRAP_ADMIN_PASSWORD` (chỉ tạo khi chưa có admin nào).
+
+Chạy cả API trong Docker: `docker compose up --build` (profile `docker`).
+
+Thử R2 từ máy local: đặt `STORAGE_PROVIDER=r2` và các biến `R2_*` (xem `.env.heroku.example`).
 
 ## Build và test
-```bash
-./gradlew clean test
-./gradlew clean bootJar
-```
-
-## Docker
-```bash
-docker compose up --build
-```
-
-Compose tự dùng profile `docker`, mount `./uploads` vào `/app/uploads` và `./logs` vào `/app/logs`.
-
-## Backup production
-Backup đầy đủ cần gồm cả PostgreSQL và thư mục `uploads` vì DB chỉ lưu metadata/đường dẫn file.
 
 ```bash
-chmod +x scripts/backup-prod.sh
-./scripts/backup-prod.sh
+./gradlew test        # unit + integration test (Testcontainers: MongoDB 7 replica set, PostgreSQL 16) — cần Docker
+./gradlew stage       # build build/libs/app.jar giống Heroku
 ```
 
-Script sẽ tạo thư mục `backups/<timestamp>/` gồm:
-- `fss_db.dump`
-- `uploads.tar.gz`
-- `.env.production`
-- `backup-info.txt`
+Integration test chạy với MongoDB replica set thật (không mock repository): CRUD/pagination/filter, định dạng UUID và
+thời gian, tạo đơn đồng thời không bán vượt tồn kho, rollback khi một bước tạo đơn lỗi, coupon không vượt giới hạn,
+upload/resize/metadata/cleanup, migration PostgreSQL → MongoDB. R2 được kiểm tra bằng một S3 endpoint giả lập
+in-process (định dạng request), chưa kiểm tra với bucket R2 thật.
 
-Có thể dùng `./scripts/backup-prod.sh --no-stop-api` nếu muốn backup nóng.
+## Cấu hình (biến môi trường)
 
-## Restore production
-Restore sẽ ghi đè dữ liệu DB hiện tại và thay nội dung `uploads`, nên script bắt buộc có cờ xác nhận.
+| Biến | Bắt buộc trên Heroku | Ý nghĩa |
+|---|---|---|
+| `SPRING_PROFILES_ACTIVE` | `heroku` (Procfile mặc định) | Profile production |
+| `MONGODB_URI` | ✔ | Connection string Atlas, nên kèm `retryWrites=true&w=majority&maxPoolSize=10` |
+| `MONGODB_DATABASE` | | Tên database (mặc định `fss`) |
+| `APP_JWT_SECRET` | ✔ | Chuỗi ngẫu nhiên ≥ 64 ký tự; profile heroku từ chối secret mặc định/ngắn |
+| `APP_CORS_ALLOWED_ORIGINS` | ✔ | Danh sách domain frontend, phân tách dấu phẩy, không dùng `*` |
+| `STORAGE_PROVIDER` | `r2` | `local` bị chặn trên profile heroku (disk của dyno bị xóa khi restart) |
+| `R2_ENDPOINT` | ✔ | `https://<account-id>.r2.cloudflarestorage.com` |
+| `R2_BUCKET` | ✔ | Tên bucket |
+| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | ✔ | R2 API token (chỉ ở backend) |
+| `R2_PUBLIC_BASE_URL` | ✔ | Domain public của bucket, ví dụ `https://img.example.com`; ảnh có URL `<base>/files/<path>` |
+| `APP_CDN_BASE_URL` | | Ghi đè base URL public của ảnh (mặc định `R2_PUBLIC_BASE_URL/files`) |
+| `APP_CONTENT_ALLOWED_IMAGE_HOSTS` | | Domain cũ xuất hiện trong HTML bài viết/sản phẩm (để giữ và chuyển hướng ảnh cũ) |
+| `APP_BOOTSTRAP_ADMIN_EMAIL`, `APP_BOOTSTRAP_ADMIN_PASSWORD` | | Tạo admin đầu tiên nếu DB chưa có admin (mật khẩu ≥ 12 ký tự) |
+| `APP_FILE_CLEANUP_INACTIVE_TTL` | | Thời gian giữ file chưa dùng trước khi xóa (mặc định `PT24H`) |
+| `APP_IMAGE_MAX_CONCURRENT` | | Số ảnh xử lý đồng thời (mặc định 2) |
+| `APP_IMAGE_MAX_PIXELS` | | Giới hạn tổng pixel trước khi decode (mặc định 40 000 000) |
+| `APP_IMAGE_JPEG_QUALITY` | | Chất lượng nén JPEG (mặc định 0.85) |
+| `APP_UPLOAD_MAX_FILE_SIZE` | | Dung lượng upload tối đa (mặc định `10MB`) |
+| `JVM_MAX_HEAP` | | Heap tối đa (mặc định `200m`, xem phần bộ nhớ trong tài liệu deploy) |
 
-```bash
-chmod +x scripts/restore-prod.sh
-./scripts/restore-prod.sh --backup-dir backups/2026-06-29-134700 --yes
-```
-
-Script sẽ:
-- dừng `api`
-- restore `fss_db.dump` vào PostgreSQL hiện tại
-- đổi tên `uploads` hiện tại thành `uploads.before-restore-<timestamp>`
-- giải nén `uploads.tar.gz`
-- bật lại `api` nếu restore thành công
-
-Deploy production trên Google Cloud VM: xem [docs/deploy-google-cloud-vm.md](docs/deploy-google-cloud-vm.md).
-CI/CD deploy nhánh `dev`: xem [docs/cicd-dev-deploy.md](docs/cicd-dev-deploy.md).
+Mẫu đầy đủ chỉ có placeholder: [`.env.heroku.example`](.env.heroku.example).
 
 ## Endpoint chính
-- `GET /api/health`
-- `POST /api/admin/auth/register`
-- `POST /api/admin/auth/login`
-- `POST /api/admin/auth/refresh`
-- `POST /api/admin/auth/logout`
-- `POST /api/files/upload`
-- `POST /api/admin/files/upload`
-- `GET /files/{yyyy-MM-dd}/{file-name}`
-- `GET /api/categories`
-- `GET /api/products`
-- `GET /api/products/featured`
-- `GET /api/products/{slug}`
-- `GET /api/landing-banners`
-- `POST /api/orders`
-- `POST /api/coupons/validate`
-- `GET|POST|PUT|DELETE /api/admin/categories`
-- `GET|POST|PUT|DELETE /api/admin/products`
-- `POST|PUT|DELETE /api/admin/products/{productId}/variants`
-- `POST|PUT|DELETE /api/admin/products/{productId}/skus`
-- `GET|PATCH /api/admin/orders`
-- `PATCH /api/admin/orders/{id}/payment`
-- `PATCH /api/admin/orders/{id}/shipping`
-- `GET /api/admin/orders/{id}/status-history`
-- `GET|POST|PUT|DELETE /api/admin/landing-banners`
-- `GET|POST|PUT|DELETE /api/admin/coupons`
-- `GET|POST|PUT|DELETE /api/admin/users`
-- `GET|POST|PUT|DELETE /api/admin/customers`
+Không đổi so với bản PostgreSQL (cùng path, request, response, định dạng UUID và thời gian UTC ISO-8601):
+- `GET /api/health` (và `GET /actuator/health` trả `{"status":"UP"}`; các actuator endpoint khác bị chặn)
+- `POST /api/admin/auth/register|login|refresh|logout`
+- `POST /api/files/upload`, `POST /api/admin/files/upload` → `{fileId, path, url, resized, width, height}`
+- `GET /files/{yyyy-MM-dd}/{file-name}` (local: trả file; R2: chuyển hướng 301 sang URL R2)
+- `GET /api/categories|brands|products|products/featured|products/{slug}|collections|blogs|landing-banners|master-data`
+- `POST /api/orders`, `POST /api/coupons/validate`
+- `GET|POST|PUT|PATCH|DELETE /api/admin/...` cho categories, brands, products (+variants, skus), sizes, colors,
+  orders (+status, payment, shipping, status-history), landing-banners, coupons, collections, blogs, users, customers.
 
-## Database migration
-Baseline hiện tại nằm trong:
-- `src/main/resources/db/migration/V1__init_schema.sql`
-- `src/main/resources/db/migration/V2__seed_admin.sql`
+## Triển khai cũ (Google Cloud VM)
+`docker-compose.prod.yml`, `scripts/*.sh`, `.github/workflows/deploy-dev.yml` và `docs/deploy-google-cloud-vm.md`
+thuộc cách deploy cũ (VM + Docker). Workflow `deploy-dev.yml` **không còn tự chạy** khi push lên `dev`; chỉ chạy tay
+(Actions → Deploy Dev → Run workflow) và cần `.env.production` trên VM có `MONGODB_URI` + biến R2.
 
-Project này là baseline mới, đã bỏ toàn bộ phần copy cũ như `presets/templates` và `design_submissions`.
-
-## Cấu hình quan trọng
-- `spring.datasource.*`: PostgreSQL connection.
-- `spring.flyway.locations=classpath:db/migration`.
-- `mybatis.mapper-locations=classpath*:mappers/**/*.xml`.
-- `app.upload-dir`: thư mục lưu file upload.
-- `app.cdn.base-url`: base URL public cho file.
-- `app.cors.allowed-origins`: danh sách frontend origin được phép gọi API.
+## Quy trình làm việc
+- Làm tính năng trên nhánh riêng → Pull Request vào `dev` (workflow CI chạy test, không deploy).
+- Deploy production khi muốn: `git checkout dev && git pull && git push heroku dev:main`.
+- Rollback: `heroku releases -a thepocketshoes` → `heroku rollback v<N> -a thepocketshoes`. PostgreSQL trong compose cũ chỉ còn để backup/đọc dữ liệu cũ khi chuyển đổi.

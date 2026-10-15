@@ -5,6 +5,8 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.safety.Cleaner;
 import org.jsoup.safety.Safelist;
+import com.fss.backend.file.FileUrlService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -32,8 +34,17 @@ public class HtmlSanitizerService {
     private final Safelist safelist;
     private final Set<String> allowedImageHosts;
 
+    @Autowired
     public HtmlSanitizerService(@Value("${app.content.allowed-image-hosts:localhost,127.0.0.1}") String allowedImageHosts,
-                                @Value("${app.cdn.base-url:/files}") String cdnBaseUrl) {
+                                FileUrlService fileUrlService) {
+        this(allowedImageHosts, fileUrlService.baseUrl());
+    }
+
+    /**
+     * @param allowedImageHosts hosts whose {@code /files/<path>} images are accepted (old domains, CDN, R2 domain)
+     * @param cdnBaseUrl        current public file base URL; its host is always allowed
+     */
+    public HtmlSanitizerService(String allowedImageHosts, String cdnBaseUrl) {
         this.allowedImageHosts = parseHosts(allowedImageHosts);
         addHostFromUrl(cdnBaseUrl, this.allowedImageHosts);
         this.safelist = new Safelist()
@@ -158,7 +169,12 @@ public class HtmlSanitizerService {
     }
 
     private boolean isAllowedImageSrc(String src) {
-        return HtmlFilePathUtils.localFilePath(src, allowedImageHosts) != null;
+        return imagePath(src) != null;
+    }
+
+    /** Relative file path for an image source this app manages ({@code /files/<path>} on an allowed host), else null. */
+    public String imagePath(String src) {
+        return HtmlFilePathUtils.localFilePath(src, allowedImageHosts);
     }
 
     private void removeUnsafeLink(Element link) {

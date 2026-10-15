@@ -11,36 +11,36 @@ import java.util.UUID;
 
 @Service
 public class BannerService {
-    private final BannerMapper mapper;
+    private final BannerRepository repository;
     private final EcommerceSupport support;
     private final FileReferenceService fileReferenceService;
 
-    public BannerService(BannerMapper mapper, EcommerceSupport support, FileReferenceService fileReferenceService) {
-        this.mapper = mapper;
+    public BannerService(BannerRepository repository, EcommerceSupport support, FileReferenceService fileReferenceService) {
+        this.repository = repository;
         this.support = support;
         this.fileReferenceService = fileReferenceService;
     }
 
     public PageResult<LandingBanner> listPublicBanners(int page, int limit) {
         int safeLimit = support.safeLimit(limit);
-        List<LandingBanner> items = mapper.listBanners(true, null, safeLimit, support.offset(page, safeLimit))
+        List<LandingBanner> items = repository.listBanners(true, null, safeLimit, support.offset(page, safeLimit))
                 .stream().map(this::withBannerUrl).toList();
-        return support.pageResult(items, page, safeLimit, mapper.countBanners(true, null));
+        return support.pageResult(items, page, safeLimit, repository.countBanners(true, null));
     }
 
     public PageResult<LandingBanner> listAdminBanners(String status, int page, int limit) {
         String normalizedStatus = support.normalizeStatusNullable(status);
         int safeLimit = support.safeLimit(limit);
-        List<LandingBanner> items = mapper.listBanners(false, normalizedStatus, safeLimit, support.offset(page, safeLimit))
+        List<LandingBanner> items = repository.listBanners(false, normalizedStatus, safeLimit, support.offset(page, safeLimit))
                 .stream().map(this::withBannerUrl).toList();
-        return support.pageResult(items, page, safeLimit, mapper.countBanners(false, normalizedStatus));
+        return support.pageResult(items, page, safeLimit, repository.countBanners(false, normalizedStatus));
     }
 
     @Transactional
     public UUID createBanner(LandingBannerRequest request) {
         UUID id = UUID.randomUUID();
         support.activateFile(request.fileId());
-        mapper.insertBanner(id, request.title(), request.subtitle(), request.linkUrl(), request.fileId(),
+        repository.insertBanner(id, request.title(), request.subtitle(), request.linkUrl(), request.fileId(),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE), support.nz(request.sortOrder()),
                 request.startsAt(), request.endsAt(), support.adminId());
         return id;
@@ -48,10 +48,10 @@ public class BannerService {
 
     @Transactional
     public void updateBanner(UUID id, LandingBannerRequest request) {
-        LandingBanner existing = mapper.findBannerById(id);
+        LandingBanner existing = repository.findBannerById(id);
         support.require(existing != null, "Banner not found");
         support.activateFile(request.fileId());
-        mapper.updateBanner(id, request.title(), request.subtitle(), request.linkUrl(), request.fileId(),
+        repository.updateBanner(id, request.title(), request.subtitle(), request.linkUrl(), request.fileId(),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE), support.nz(request.sortOrder()),
                 request.startsAt(), request.endsAt(), support.adminId());
         fileReferenceService.releaseFile(existing.fileId());
@@ -59,9 +59,9 @@ public class BannerService {
 
     @Transactional
     public void deleteBanner(UUID id) {
-        LandingBanner existing = mapper.findBannerById(id);
+        LandingBanner existing = repository.findBannerById(id);
         support.require(existing != null, "Banner not found");
-        mapper.softDeleteBanner(id, support.adminId());
+        repository.softDeleteBanner(id, support.adminId());
         fileReferenceService.releaseFile(existing.fileId());
     }
 

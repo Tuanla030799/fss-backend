@@ -18,17 +18,17 @@ import java.util.UUID;
 public class BlogPostService {
     private static final Set<String> POST_STATUSES = Set.of(EcommerceSupport.ACTIVE, EcommerceSupport.INACTIVE, EcommerceSupport.DRAFT);
 
-    private final BlogPostMapper mapper;
+    private final BlogPostRepository repository;
     private final EcommerceSupport support;
     private final HtmlSanitizerService htmlSanitizerService;
     private final HtmlContentImageUsageService htmlContentImageUsageService;
     private final FileReferenceService fileReferenceService;
 
-    public BlogPostService(BlogPostMapper mapper, EcommerceSupport support,
+    public BlogPostService(BlogPostRepository repository, EcommerceSupport support,
                            HtmlSanitizerService htmlSanitizerService,
                            HtmlContentImageUsageService htmlContentImageUsageService,
                            FileReferenceService fileReferenceService) {
-        this.mapper = mapper;
+        this.repository = repository;
         this.support = support;
         this.htmlSanitizerService = htmlSanitizerService;
         this.htmlContentImageUsageService = htmlContentImageUsageService;
@@ -37,13 +37,13 @@ public class BlogPostService {
 
     public PageResult<BlogPost> listPublicPosts(String keyword, int page, int limit) {
         int safeLimit = support.safeLimit(limit);
-        List<BlogPost> items = mapper.listPosts(true, null, keyword, safeLimit, support.offset(page, safeLimit))
+        List<BlogPost> items = repository.listPosts(true, null, keyword, safeLimit, support.offset(page, safeLimit))
                 .stream().map(this::withCoverUrl).toList();
-        return support.pageResult(items, page, safeLimit, mapper.countPosts(true, null, keyword));
+        return support.pageResult(items, page, safeLimit, repository.countPosts(true, null, keyword));
     }
 
     public BlogPost getPublicPost(String slug) {
-        BlogPost post = mapper.findPostBySlug(slug, true);
+        BlogPost post = repository.findPostBySlug(slug, true);
         support.require(post != null, "Blog post not found");
         return withCoverUrl(post);
     }
@@ -51,13 +51,13 @@ public class BlogPostService {
     public PageResult<BlogPost> listAdminPosts(String status, String keyword, int page, int limit) {
         String normalizedStatus = normalizePostStatusNullable(status);
         int safeLimit = support.safeLimit(limit);
-        List<BlogPost> items = mapper.listPosts(false, normalizedStatus, keyword, safeLimit, support.offset(page, safeLimit))
+        List<BlogPost> items = repository.listPosts(false, normalizedStatus, keyword, safeLimit, support.offset(page, safeLimit))
                 .stream().map(this::withCoverUrl).toList();
-        return support.pageResult(items, page, safeLimit, mapper.countPosts(false, normalizedStatus, keyword));
+        return support.pageResult(items, page, safeLimit, repository.countPosts(false, normalizedStatus, keyword));
     }
 
     public BlogPost getAdminPost(UUID id) {
-        BlogPost post = mapper.findPostById(id);
+        BlogPost post = repository.findPostById(id);
         support.require(post != null, "Blog post not found");
         return withCoverUrl(post);
     }
@@ -68,8 +68,9 @@ public class BlogPostService {
         support.activateFile(request.coverFileId());
         String status = normalizePostStatusDefault(request.status());
         ContentPayload content = contentPayload(request);
-        mapper.insertPost(id, request.title().trim(), uniqueSlug(request.slug(), request.title(), null),
-                request.excerpt(), content.legacyJson(), content.html(), request.coverFileId(), status,
+        repository.insertPost(id, request.title().trim(), uniqueSlug(request.slug(), request.title(), null),
+                request.excerpt(), content.html(), htmlContentImageUsageService.filePathList(content.html()),
+                request.coverFileId(), status,
                 normalizePublishedAt(status, request.publishedAt()), support.adminId());
         htmlContentImageUsageService.activateImages(content.html());
         return id;
@@ -77,13 +78,14 @@ public class BlogPostService {
 
     @Transactional
     public void updatePost(UUID id, BlogPostRequest request) {
-        BlogPost existing = mapper.findPostById(id);
+        BlogPost existing = repository.findPostById(id);
         support.require(existing != null, "Blog post not found");
         support.activateFile(request.coverFileId());
         String status = normalizePostStatusDefault(request.status());
         ContentPayload content = contentPayload(request);
-        mapper.updatePost(id, request.title().trim(), uniqueSlug(request.slug(), request.title(), id),
-                request.excerpt(), content.legacyJson(), content.html(), request.coverFileId(), status,
+        repository.updatePost(id, request.title().trim(), uniqueSlug(request.slug(), request.title(), id),
+                request.excerpt(), content.html(), htmlContentImageUsageService.filePathList(content.html()),
+                request.coverFileId(), status,
                 normalizePublishedAt(status, request.publishedAt()), support.adminId());
         htmlContentImageUsageService.activateImages(content.html());
         fileReferenceService.releaseFile(existing.coverFileId());
@@ -92,9 +94,9 @@ public class BlogPostService {
 
     @Transactional
     public void deletePost(UUID id) {
-        BlogPost existing = mapper.findPostById(id);
+        BlogPost existing = repository.findPostById(id);
         support.require(existing != null, "Blog post not found");
-        mapper.softDeletePost(id, support.adminId());
+        repository.softDeletePost(id, support.adminId());
         fileReferenceService.releaseFile(existing.coverFileId());
         fileReferenceService.releaseRemovedHtmlImages(existing.contentHtml(), null);
     }
@@ -118,14 +120,14 @@ public class BlogPostService {
 
     private String uniqueSlug(String slug, String title, UUID exclude) {
         String normalized = support.uniqueSlug(slug, title);
-        support.require(mapper.countPostSlug(normalized, exclude) == 0, "Blog slug already exists");
+        support.require(!repository.slugExists(normalized, exclude), "Blog slug already exists");
         return normalized;
     }
 
     private BlogPost withCoverUrl(BlogPost post) {
-        return post == null || post.coverImageUrl() == null ? post : new BlogPost(post.id(), post.title(), post.slug(),
-                post.excerpt(), "{}", post.contentHtml(), post.coverFileId(), support.publicUrl(post.coverImageUrl()),
-                post.status(), post.publishedAt(), post.createdAt());
+        return post == null ? null : new BlogPost(post.id(), post.title(), post.slug(),
+                post.excerpt(), "{}", htmlContentImageUsageService.rewriteForOutput(post.contentHtml()), post.coverFileId(),
+                support.publicUrl(post.coverImageUrl()), post.status(), post.publishedAt(), post.createdAt());
     }
 
     private ContentPayload contentPayload(BlogPostRequest request) {
@@ -133,12 +135,12 @@ public class BlogPostService {
         if (html == null && looksLikeHtml(request.contentJson())) {
             html = request.contentJson();
         }
-        return new ContentPayload("{}", htmlSanitizerService.sanitize(html));
+        return new ContentPayload(htmlSanitizerService.sanitize(html));
     }
 
     private boolean looksLikeHtml(String value) {
         return value != null && value.trim().startsWith("<");
     }
 
-    private record ContentPayload(String legacyJson, String html) {}
+    private record ContentPayload(String html) {}
 }

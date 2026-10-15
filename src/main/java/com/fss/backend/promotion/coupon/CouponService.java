@@ -14,25 +14,26 @@ import java.util.UUID;
 
 @Service
 public class CouponService {
-    private final CouponMapper mapper;
+    private final CouponRepository repository;
     private final EcommerceSupport support;
 
-    public CouponService(CouponMapper mapper, EcommerceSupport support) {
-        this.mapper = mapper;
+    public CouponService(CouponRepository repository, EcommerceSupport support) {
+        this.repository = repository;
         this.support = support;
     }
 
     public PageResult<Coupon> listCoupons(String status, String keyword, int page, int limit) {
         String normalizedStatus = support.normalizeStatusNullable(status);
         int safeLimit = support.safeLimit(limit);
-        List<Coupon> items = mapper.listCoupons(normalizedStatus, keyword, safeLimit, support.offset(page, safeLimit));
-        return support.pageResult(items, page, safeLimit, mapper.countCoupons(normalizedStatus, keyword));
+        List<Coupon> items = repository.listCoupons(normalizedStatus, keyword, safeLimit, support.offset(page, safeLimit));
+        return support.pageResult(items, page, safeLimit, repository.countCoupons(normalizedStatus, keyword));
     }
 
     @Transactional
     public UUID createCoupon(CouponRequest request) {
         UUID id = UUID.randomUUID();
-        mapper.insertCoupon(id, request.code(), request.name(), support.discountType(request.discountType()), request.discountValue(),
+        support.require(!repository.codeExists(request.code(), null), "Coupon code already exists");
+        repository.insertCoupon(id, request.code(), request.name(), support.discountType(request.discountType()), request.discountValue(),
                 request.maxDiscount(), request.minOrderAmount(), request.usageLimit(), request.startsAt(), request.endsAt(),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE), support.adminId());
         return id;
@@ -40,16 +41,17 @@ public class CouponService {
 
     @Transactional
     public void updateCoupon(UUID id, CouponRequest request) {
-        support.require(mapper.findCouponById(id) != null, "Coupon not found");
-        mapper.updateCoupon(id, request.code(), request.name(), support.discountType(request.discountType()), request.discountValue(),
+        support.require(repository.findCouponById(id) != null, "Coupon not found");
+        support.require(!repository.codeExists(request.code(), id), "Coupon code already exists");
+        repository.updateCoupon(id, request.code(), request.name(), support.discountType(request.discountType()), request.discountValue(),
                 request.maxDiscount(), request.minOrderAmount(), request.usageLimit(), request.startsAt(), request.endsAt(),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE), support.adminId());
     }
 
     @Transactional
     public void deleteCoupon(UUID id) {
-        support.require(mapper.findCouponById(id) != null, "Coupon not found");
-        mapper.softDeleteCoupon(id, support.adminId());
+        support.require(repository.findCouponById(id) != null, "Coupon not found");
+        repository.softDeleteCoupon(id, support.adminId());
     }
 
     public ValidateCouponResponse validateCoupon(ValidateCouponRequest request) {
@@ -60,7 +62,7 @@ public class CouponService {
     }
 
     public Coupon requireValidCoupon(String code, BigDecimal subtotal) {
-        Coupon coupon = mapper.findCouponByCode(code);
+        Coupon coupon = repository.findCouponByCode(code);
         support.require(coupon != null && EcommerceSupport.ACTIVE.equals(coupon.status()), "Coupon is invalid");
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         support.require(coupon.startsAt() == null || !coupon.startsAt().isAfter(now), "Coupon has not started");
@@ -79,7 +81,8 @@ public class CouponService {
         return discount.min(subtotal).setScale(2, RoundingMode.HALF_UP);
     }
 
+    /** Consumes one coupon use atomically; fails (and rolls back the caller's transaction) once the limit is reached. */
     public void incrementCouponUsed(UUID id) {
-        mapper.incrementCouponUsed(id);
+        support.require(repository.tryConsumeUsage(id), "Coupon usage limit reached");
     }
 }
