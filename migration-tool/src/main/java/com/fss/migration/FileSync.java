@@ -50,7 +50,9 @@ final class FileSync {
             long size = Files.size(local);
             if (existsWithSize(key, size)) {
                 skipped++;
-            } else if (!dryRun) {
+            } else if (dryRun) {
+                uploaded++;
+            } else {
                 s3.putObject(PutObjectRequest.builder().bucket(bucket).key(key)
                         .contentType(PgToMongoMigrator.contentType(path))
                         .cacheControl("public, max-age=31536000, immutable")
@@ -63,8 +65,14 @@ final class FileSync {
                 switched++;
             }
         }
-        System.out.printf("uploaded=%d alreadyPresent=%d metadataSwitched=%d missingLocal=%d%s%n", uploaded, skipped, switched,
-                missing, dryRun ? " (dry run)" : "");
+        if (dryRun) {
+            System.out.printf("wouldUpload=%d alreadyPresent=%d missingLocal=%d (dry run, nothing written)%n", uploaded, skipped, missing);
+        } else {
+            System.out.printf("uploaded=%d alreadyPresent=%d metadataSwitched=%d missingLocal=%d%n", uploaded, skipped, switched, missing);
+        }
+        if (missing > 0) {
+            System.out.println("Files listed as missing keep their old metadata; exit code 1 only flags them for review.");
+        }
         return missing;
     }
 
