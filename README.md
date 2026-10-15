@@ -86,6 +86,10 @@ Không đổi so với bản PostgreSQL (cùng path, request, response, định 
 
 ## Triển khai cũ (Google Cloud VM)
 `docker-compose.prod.yml`, `scripts/*.sh`, `.github/workflows/deploy-dev.yml` và `docs/deploy-google-cloud-vm.md`
-thuộc cách deploy cũ (VM + Docker). Workflow `deploy-dev.yml` vẫn tự deploy khi push lên nhánh `dev`: sau khi merge
-code MongoDB vào `dev`, file `.env.production` trên VM phải có `MONGODB_URI` (xem `.env.production.example`), nếu
-không API trên VM sẽ không khởi động. PostgreSQL trong compose cũ chỉ còn để backup/đọc dữ liệu cũ khi chuyển đổi.
+thuộc cách deploy cũ (VM + Docker). Workflow `deploy-dev.yml` **không còn tự chạy** khi push lên `dev`; chỉ chạy tay
+(Actions → Deploy Dev → Run workflow) và cần `.env.production` trên VM có `MONGODB_URI` + biến R2.
+
+## Quy trình làm việc
+- Làm tính năng trên nhánh riêng → Pull Request vào `dev` (workflow CI chạy test, không deploy).
+- Deploy production khi muốn: `git checkout dev && git pull && git push heroku dev:main`.
+- Rollback: `heroku releases -a thepocketshoes` → `heroku rollback v<N> -a thepocketshoes`. PostgreSQL trong compose cũ chỉ còn để backup/đọc dữ liệu cũ khi chuyển đổi.

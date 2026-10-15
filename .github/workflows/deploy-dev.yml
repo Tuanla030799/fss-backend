@@ -1,9 +1,9 @@
 name: Deploy Dev
 
+# Legacy Google Cloud VM deployment. Automatic deploy on push to dev is disabled since production moved to
+# Heroku + MongoDB Atlas + Cloudflare R2 (see docs/deploy-heroku-mongodb-r2.md). Run manually only if the VM's
+# .env.production has MONGODB_URI and the R2 variables.
 on:
-  push:
-    branches:
-      - dev
   workflow_dispatch:
 
 concurrency:
