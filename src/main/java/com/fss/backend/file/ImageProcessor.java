@@ -4,6 +4,7 @@ import com.drew.imaging.ImageMetadataReader;
 import com.drew.metadata.Metadata;
 import com.drew.metadata.exif.ExifIFD0Directory;
 import com.fss.backend.common.ApiException;
+import com.fss.backend.common.ErrorCode;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -119,10 +120,10 @@ public class ImageProcessor {
     public Result process(byte[] bytes) throws IOException {
         Format format = detect(bytes);
         if (format == Format.HEIF) {
-            throw new ApiException("HEIC/HEIF/AVIF images are not supported; please convert to JPEG or PNG before uploading");
+            throw new ApiException(ErrorCode.FILE_TYPE_NOT_SUPPORTED, "HEIC/HEIF/AVIF images are not supported; please convert to JPEG or PNG before uploading");
         }
         if (format == Format.UNKNOWN) {
-            throw new ApiException("Unsupported file type; only JPEG, PNG, GIF or WebP images are allowed");
+            throw new ApiException(ErrorCode.FILE_TYPE_NOT_SUPPORTED, "Unsupported file type; only JPEG, PNG, GIF or WebP images are allowed");
         }
         acquire();
         try {
@@ -140,7 +141,7 @@ public class ImageProcessor {
                 int width = reader.getWidth(0);
                 int height = reader.getHeight(0);
                 if (width <= 0 || height <= 0 || (long) width * height > maxPixels) {
-                    throw new ApiException("Image dimensions are too large (max " + maxPixels + " pixels)");
+                    throw new ApiException(ErrorCode.IMAGE_TOO_LARGE, "Image dimensions are too large (max " + maxPixels + " pixels)");
                 }
                 if (format == Format.GIF) {
                     // Keep GIFs byte-for-byte so animations survive; they carry no EXIF/GPS data.
@@ -181,18 +182,18 @@ public class ImageProcessor {
             throw ex;
         } catch (IOException | RuntimeException ex) {
             log.warn("Image decode failed format={} cause={}", format, ex.toString());
-            throw new ApiException("Image file is corrupted or cannot be processed");
+            throw new ApiException(ErrorCode.IMAGE_CORRUPTED, "Image file is corrupted or cannot be processed");
         }
     }
 
     private ImageReader readerFor(ImageInputStream input, Format format) {
-        if (input == null) throw new ApiException("Image file is corrupted or cannot be processed");
+        if (input == null) throw new ApiException(ErrorCode.IMAGE_CORRUPTED, "Image file is corrupted or cannot be processed");
         Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
         if (!readers.hasNext()) {
             readers = ImageIO.getImageReadersByMIMEType(format.contentType);
         }
         if (!readers.hasNext()) {
-            throw new ApiException("No decoder available for " + format.name());
+            throw new ApiException(ErrorCode.FILE_TYPE_NOT_SUPPORTED, "No decoder available for " + format.name());
         }
         return readers.next();
     }
@@ -200,11 +201,11 @@ public class ImageProcessor {
     private void acquire() {
         try {
             if (!permits.tryAcquire(acquireTimeoutMs, TimeUnit.MILLISECONDS)) {
-                throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "Server is busy processing images, please retry");
+                throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.SERVER_BUSY, "Server is busy processing images, please retry");
             }
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
-            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "Server is busy processing images, please retry");
+            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.SERVER_BUSY, "Server is busy processing images, please retry");
         }
     }
 

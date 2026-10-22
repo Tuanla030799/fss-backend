@@ -2,6 +2,7 @@ package com.fss.backend.file;
 
 import com.fss.backend.auth.CurrentAdmin;
 import com.fss.backend.common.ApiException;
+import com.fss.backend.common.ErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -69,7 +70,7 @@ public class FileService {
 
     public Map<String, String> upload(MultipartFile file) throws IOException {
         if (file == null || file.isEmpty()) {
-            throw new ApiException("File is empty");
+            throw new ApiException(ErrorCode.FILE_EMPTY, "File is empty");
         }
         ImageProcessor.Result image = imageProcessor.process(file.getBytes());
 
@@ -87,7 +88,7 @@ public class FileService {
         } catch (IOException | RuntimeException ex) {
             log.error("File upload to storage failed fileId={} key={} provider={}", id, objectKey, storage.provider(), ex);
             discardFailedUpload(id, null);
-            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "File storage is temporarily unavailable, please retry");
+            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.STORAGE_UNAVAILABLE, "File storage is temporarily unavailable, please retry");
         }
 
         boolean marked;
@@ -96,11 +97,11 @@ public class FileService {
         } catch (RuntimeException ex) {
             log.error("File metadata update failed after upload fileId={} key={}", id, objectKey, ex);
             discardFailedUpload(id, objectKey);
-            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "File metadata could not be saved, please retry");
+            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.STORAGE_UNAVAILABLE, "File metadata could not be saved, please retry");
         }
         if (!marked) {
             discardFailedUpload(id, objectKey);
-            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "File metadata could not be saved, please retry");
+            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.STORAGE_UNAVAILABLE, "File metadata could not be saved, please retry");
         }
         log.info("File uploaded fileId={} path={} provider={} size={} resized={}", id, relativePath, storage.provider(),
                 image.bytes().length, image.resized());

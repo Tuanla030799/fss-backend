@@ -98,7 +98,7 @@ public class ProductCollectionRepository {
         List<ProductDocument> ordered = orderedProducts(collectionId, publicOnly);
         int from = Math.min(offset, ordered.size());
         int to = Math.min(from + limit, ordered.size());
-        return products.summaries(ordered.subList(from, to));
+        return products.summaries(ordered.subList(from, to), publicOnly);
     }
 
     public long countCollectionProducts(UUID collectionId, boolean publicOnly) {
@@ -137,6 +137,7 @@ public class ProductCollectionRepository {
         Map<UUID, String> paths = files.findPathsByIds(docs.stream().map(CollectionDocument::fileId).filter(Objects::nonNull).toList());
         return docs.stream().map(doc -> new ProductCollection(doc.id(), doc.name(), doc.slug(), doc.excerpt(),
                 doc.descriptionHtml(), doc.fileId(), doc.fileId() == null ? null : paths.get(doc.fileId()), doc.status(),
-                doc.sortOrder(), doc.products() == null ? 0 : doc.products().size(), odt(doc.createdAt()))).toList();
+                doc.sortOrder(), doc.products() == null ? 0 : doc.products().size(), odt(doc.createdAt()),
+                odt(doc.updatedAt()))).toList();
     }
 }

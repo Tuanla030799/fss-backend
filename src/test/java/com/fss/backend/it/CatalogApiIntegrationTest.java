@@ -86,6 +86,7 @@ class CatalogApiIntegrationTest extends MongoIntegrationTest {
         assertEquals(gallery.get("url").asText(), summary.get("primaryImageUrl").asText());
         assertTrue(summary.get("brandSizeGuideUrl").isNull());
         assertTrue(UTC_TIME.matcher(summary.get("createdAt").asText()).matches(), summary.get("createdAt").asText());
+        assertTrue(UTC_TIME.matcher(summary.get("updatedAt").asText()).matches(), summary.get("updatedAt").asText());
 
         // ---- filters (same semantics as the SQL version)
         assertEquals(1, getData("/api/products?keyword=" + keyword + "&size=40").get("total").asLong());
@@ -116,10 +117,12 @@ class CatalogApiIntegrationTest extends MongoIntegrationTest {
 
         // ---- validation & uniqueness
         mvc.perform(admin(jsonBody(post("/api/admin/products"), Map.of("categoryId", categoryId, "name", "Dup", "slug", slug))))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Product slug already exists"));
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("SLUG_ALREADY_EXISTS"))
+                .andExpect(jsonPath("$.message").value("Product slug already exists"));
         mvc.perform(admin(jsonBody(post("/api/admin/products"), Map.of("name", "No category"))))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false));
-        mvc.perform(get("/api/admin/products")).andExpect(status().isUnauthorized());
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR")).andExpect(jsonPath("$.errors[0].field").value("categoryId"));
+        mvc.perform(get("/api/admin/products")).andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("AUTH_REQUIRED"));
 
         // ---- update: replacing gallery image releases the old file, the HTML image stays in use
         JsonNode newGallery = uploadImage(TestImages.png(30, 30, false), "new.png");
@@ -141,8 +144,8 @@ class CatalogApiIntegrationTest extends MongoIntegrationTest {
 
         // ---- delete
         mvc.perform(admin(delete("/api/admin/products/" + productId))).andExpect(status().isOk());
-        mvc.perform(get("/api/products/" + slug)).andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Product not found"));
+        mvc.perform(get("/api/products/" + slug)).andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("PRODUCT_NOT_FOUND")).andExpect(jsonPath("$.message").value("Product not found"));
         assertEquals("INACTIVE", fileStatus(inline));
     }
 
@@ -183,14 +186,17 @@ class CatalogApiIntegrationTest extends MongoIntegrationTest {
         String value = unique("XL");
         createId("/api/admin/sizes", Map.of("value", value));
         mvc.perform(admin(jsonBody(post("/api/admin/sizes"), Map.of("value", value.toLowerCase()))))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Size already exists"));
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("SIZE_ALREADY_EXISTS"))
+                .andExpect(jsonPath("$.message").value("Size already exists"));
 
         String customerPhone = "09" + (int) (Math.random() * 1_0000_0000);
         String customerId = createId("/api/admin/customers", Map.of("fullName", "A", "phone", customerPhone, "email", "A@Example.com"));
         mvc.perform(admin(jsonBody(post("/api/admin/customers"), Map.of("fullName", "B", "phone", customerPhone))))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Phone already exists"));
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PHONE_ALREADY_EXISTS"))
+                .andExpect(jsonPath("$.message").value("Phone already exists"));
         mvc.perform(admin(jsonBody(post("/api/admin/customers"), Map.of("fullName", "B", "phone", customerPhone + "1", "email", "a@example.COM"))))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Email already exists"));
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("EMAIL_ALREADY_EXISTS"))
+                .andExpect(jsonPath("$.message").value("Email already exists"));
         mvc.perform(admin(delete("/api/admin/customers/" + customerId))).andExpect(status().isOk());
         createId("/api/admin/customers", Map.of("fullName", "C", "phone", customerPhone));
 
@@ -202,6 +208,9 @@ class CatalogApiIntegrationTest extends MongoIntegrationTest {
         assertEquals(0, coupons.get("items").get(0).get("usedCount").asInt());
         JsonNode validated = body(mvc.perform(jsonBody(post("/api/coupons/validate"), Map.of("code", code, "subtotalAmount", "199.99")))
                 .andExpect(status().isOk()).andReturn()).get("data");
+        assertTrue(validated.get("valid").asBoolean());
+        assertTrue(validated.get("code").isNull());
+        assertEquals(code.toUpperCase(), validated.get("couponCode").asText());
         assertEquals("20.00", validated.get("discountAmount").decimalValue().toPlainString());
         assertEquals("179.99", validated.get("finalAmount").decimalValue().toPlainString());
     }
@@ -218,6 +227,7 @@ class CatalogApiIntegrationTest extends MongoIntegrationTest {
         assertEquals(cover.get("url").asText(), post.get("coverImageUrl").asText());
         assertEquals("{}", post.get("contentJson").asText());
         assertNotNull(post.get("publishedAt").asText());
+        assertTrue(UTC_TIME.matcher(post.get("updatedAt").asText()).matches(), post.get("updatedAt").asText());
         assertEquals("ACTIVE", fileStatus(inline));
 
         // Removing the image from HTML releases it; deleting the post releases the cover.
@@ -248,6 +258,7 @@ class CatalogApiIntegrationTest extends MongoIntegrationTest {
                 Map.of("productId", p1, "sortOrder", 2), Map.of("productId", p2, "sortOrder", 1), Map.of("productId", draft, "sortOrder", 0))));
         JsonNode collection = getData("/api/collections/" + collectionSlug);
         assertEquals(3, collection.get("productCount").asInt());
+        assertTrue(UTC_TIME.matcher(collection.get("updatedAt").asText()).matches(), collection.get("updatedAt").asText());
         assertEquals(2, collection.get("products").get("total").asLong());
         assertEquals(p2, collection.get("products").get("items").get(0).get("id").asText());
         assertEquals(p1, collection.get("products").get("items").get(1).get("id").asText());

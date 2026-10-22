@@ -1,6 +1,7 @@
 package com.fss.backend.content.html;
 
 import com.fss.backend.common.ApiException;
+import com.fss.backend.common.ErrorCode;
 import com.fss.backend.file.FileAsset;
 import com.fss.backend.file.FileAssetRepository;
 import com.fss.backend.file.FileUrlService;
@@ -85,7 +86,7 @@ public class HtmlContentImageUsageService {
     private void activateByPath(String path) {
         FileAsset file = fileAssetRepository.findByPath(path);
         if (file != null && fileAssetRepository.activate(file.id(), support.adminId()) == FileAssetRepository.ActivationResult.UNAVAILABLE) {
-            throw new ApiException("Image in content is no longer available, please re-upload: " + path);
+            throw new ApiException(ErrorCode.FILE_UNAVAILABLE, "Image in content is no longer available, please re-upload: " + path);
         }
     }
 

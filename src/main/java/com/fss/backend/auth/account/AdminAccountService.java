@@ -1,5 +1,6 @@
 package com.fss.backend.auth.account;
 
+import com.fss.backend.common.ErrorCode;
 import com.fss.backend.common.PageResult;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,8 +30,8 @@ public class AdminAccountService {
 
     @Transactional
     public UUID createAdminAccount(AdminAccountRequest request) {
-        support.require(request.password() != null && !request.password().isBlank(), "Password is required");
-        support.require(!repository.adminEmailExists(request.email(), null), "Email already exists");
+        support.require(request.password() != null && !request.password().isBlank(), ErrorCode.VALIDATION_ERROR, "Password is required");
+        support.requireUnique(!repository.adminEmailExists(request.email(), null), ErrorCode.EMAIL_ALREADY_EXISTS, "Email already exists");
         UUID id = UUID.randomUUID();
         repository.insertAdminAccount(id, request.name(), request.email(), passwordEncoder.encode(request.password()), role(request.role()),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE));
@@ -39,8 +40,8 @@ public class AdminAccountService {
 
     @Transactional
     public void updateAdminAccount(UUID id, AdminAccountRequest request) {
-        support.require(repository.findAdminAccountById(id) != null, "Admin user not found");
-        support.require(!repository.adminEmailExists(request.email(), id), "Email already exists");
+        support.requireFound(repository.findAdminAccountById(id) != null, ErrorCode.ADMIN_USER_NOT_FOUND, "Admin user not found");
+        support.requireUnique(!repository.adminEmailExists(request.email(), id), ErrorCode.EMAIL_ALREADY_EXISTS, "Email already exists");
         repository.updateAdminAccount(id, request.name(), request.email(),
                 request.password() == null || request.password().isBlank() ? null : passwordEncoder.encode(request.password()),
                 role(request.role()), support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE));
@@ -48,7 +49,7 @@ public class AdminAccountService {
 
     @Transactional
     public void deleteAdminAccount(UUID id) {
-        support.require(repository.findAdminAccountById(id) != null, "Admin user not found");
+        support.requireFound(repository.findAdminAccountById(id) != null, ErrorCode.ADMIN_USER_NOT_FOUND, "Admin user not found");
         repository.softDeleteAdminAccount(id);
     }
 

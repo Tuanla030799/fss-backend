@@ -3,6 +3,7 @@ package com.fss.backend.sales.order;
 import com.fss.backend.promotion.coupon.Coupon;
 import com.fss.backend.promotion.coupon.CouponService;
 import com.fss.backend.catalog.sku.SkuForOrder;
+import com.fss.backend.common.ErrorCode;
 import com.fss.backend.common.PageResult;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import com.fss.backend.shared.mongo.MongoTransactionRunner;
@@ -55,8 +56,10 @@ public class OrderService {
         Instant now = Instant.now();
         for (CreateOrderItemRequest itemRequest : request.items()) {
             SkuForOrder sku = repository.findSkuForOrder(itemRequest.skuId());
-            support.require(sku != null, "SKU not found or inactive: " + itemRequest.skuId());
-            support.require(sku.stock() >= itemRequest.quantity(), "Not enough stock for SKU: " + sku.skuCode());
+            support.require(sku != null, ErrorCode.SKU_UNAVAILABLE,
+                    "Sản phẩm trong giỏ hàng không còn được bán (SKU " + itemRequest.skuId() + ").");
+            support.require(sku.stock() >= itemRequest.quantity(), ErrorCode.OUT_OF_STOCK,
+                    notEnoughStock(sku.productName(), sku.variantName()));
             BigDecimal unitPrice = MongoValues.money(Optional.ofNullable(sku.salePrice()).orElse(sku.price()));
             BigDecimal lineTotal = MongoValues.money(unitPrice.multiply(BigDecimal.valueOf(itemRequest.quantity())));
             subtotal = subtotal.add(lineTotal);
@@ -79,7 +82,7 @@ public class OrderService {
 
         for (OrderDocument.Item item : items) {
             int updated = repository.decrementStock(item.skuId(), item.quantity());
-            support.require(updated == 1, "Not enough stock for SKU: " + item.skuCode());
+            support.require(updated == 1, ErrorCode.OUT_OF_STOCK, notEnoughStock(item.productName(), item.variantName()));
         }
         if (coupon != null) couponService.incrementCouponUsed(coupon.id());
 
@@ -102,14 +105,14 @@ public class OrderService {
 
     public OrderDetail getOrder(UUID id) {
         OrderDocument order = repository.findOrderDocument(id);
-        support.require(order != null, "Order not found");
+        support.requireFound(order != null, ErrorCode.ORDER_NOT_FOUND, "Order not found");
         return new OrderDetail(OrderRepository.toOrder(order), OrderRepository.items(order));
     }
 
     @Transactional
     public void updateOrderStatus(UUID id, String status, String note) {
         Order order = repository.findOrderById(id);
-        support.require(order != null, "Order not found");
+        support.requireFound(order != null, ErrorCode.ORDER_NOT_FOUND, "Order not found");
         String normalized = support.normalizeOrderStatusRequired(status);
         repository.updateOrderStatus(id, order.status(), normalized, note, support.adminId());
     }
@@ -121,33 +124,39 @@ public class OrderService {
 
     @Transactional
     public void updatePayment(UUID id, PaymentUpdateRequest request) {
-        support.require(repository.findOrderById(id) != null, "Order not found");
+        support.requireFound(repository.findOrderById(id) != null, ErrorCode.ORDER_NOT_FOUND, "Order not found");
         repository.updatePayment(id, request.paymentMethod(), normalizePaymentStatus(request.paymentStatus()), request.paidAt());
     }
 
     @Transactional
     public void updateShipping(UUID id, ShippingUpdateRequest request) {
-        support.require(repository.findOrderById(id) != null, "Order not found");
+        support.requireFound(repository.findOrderById(id) != null, ErrorCode.ORDER_NOT_FOUND, "Order not found");
         repository.updateShipping(id, request.shippingMethod(), normalizeShippingStatus(request.shippingStatus()), request.trackingCode());
     }
 
     public List<OrderStatusHistory> listStatusHistory(UUID orderId) {
         OrderDocument order = repository.findOrderDocument(orderId);
-        support.require(order != null, "Order not found");
+        support.requireFound(order != null, ErrorCode.ORDER_NOT_FOUND, "Order not found");
         return OrderRepository.history(order);
+    }
+
+    /** Shown to the customer at checkout, so it names the product rather than the SKU code. */
+    private static String notEnoughStock(String productName, String variantName) {
+        String label = variantName == null || variantName.isBlank() ? productName : productName + " - " + variantName;
+        return "Sản phẩm \"" + label + "\" không đủ số lượng trong kho.";
     }
 
     private String normalizePaymentStatus(String status) {
         if (status == null || status.isBlank()) return "UNPAID";
         String normalized = status.trim().toUpperCase();
-        support.require(java.util.Set.of("UNPAID", "PAID", "REFUNDED", "FAILED").contains(normalized), "Payment status is invalid");
+        support.require(java.util.Set.of("UNPAID", "PAID", "REFUNDED", "FAILED").contains(normalized), ErrorCode.VALIDATION_ERROR, "Payment status is invalid");
         return normalized;
     }
 
     private String normalizeShippingStatus(String status) {
         if (status == null || status.isBlank()) return "PENDING";
         String normalized = status.trim().toUpperCase();
-        support.require(java.util.Set.of("PENDING", "PACKING", "SHIPPING", "DELIVERED", "RETURNED", "CANCELLED").contains(normalized), "Shipping status is invalid");
+        support.require(java.util.Set.of("PENDING", "PACKING", "SHIPPING", "DELIVERED", "RETURNED", "CANCELLED").contains(normalized), ErrorCode.VALIDATION_ERROR, "Shipping status is invalid");
         return normalized;
     }
 }

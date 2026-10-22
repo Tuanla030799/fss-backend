@@ -1,5 +1,6 @@
 package com.fss.backend.masterdata;
 
+import com.fss.backend.common.ErrorCode;
 import com.fss.backend.common.PageResult;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.springframework.stereotype.Service;
@@ -28,7 +29,7 @@ public class SizeColorService {
 
     public SizeOption getSize(UUID id) {
         SizeOption size = repository.findSizeById(id);
-        support.require(size != null, "Size not found");
+        support.requireFound(size != null, ErrorCode.SIZE_NOT_FOUND, "Size not found");
         return size;
     }
 
@@ -36,7 +37,7 @@ public class SizeColorService {
     public UUID createSize(SizeRequest request) {
         UUID id = UUID.randomUUID();
         String value = support.trimRequired(request.value(), "Size");
-        support.require(!repository.sizeValueExists(value, null), "Size already exists");
+        support.requireUnique(!repository.sizeValueExists(value, null), ErrorCode.SIZE_ALREADY_EXISTS, "Size already exists");
         repository.insertSize(id, value, support.def(support.trimToNull(request.label()), value),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
                 support.nz(request.sortOrder()), support.adminId());
@@ -45,9 +46,9 @@ public class SizeColorService {
 
     @Transactional
     public void updateSize(UUID id, SizeRequest request) {
-        support.require(repository.findSizeById(id) != null, "Size not found");
+        support.requireFound(repository.findSizeById(id) != null, ErrorCode.SIZE_NOT_FOUND, "Size not found");
         String value = support.trimRequired(request.value(), "Size");
-        support.require(!repository.sizeValueExists(value, id), "Size already exists");
+        support.requireUnique(!repository.sizeValueExists(value, id), ErrorCode.SIZE_ALREADY_EXISTS, "Size already exists");
         repository.updateSize(id, value, support.def(support.trimToNull(request.label()), value),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
                 support.nz(request.sortOrder()), support.adminId());
@@ -55,7 +56,7 @@ public class SizeColorService {
 
     @Transactional
     public void deleteSize(UUID id) {
-        support.require(repository.findSizeById(id) != null, "Size not found");
+        support.requireFound(repository.findSizeById(id) != null, ErrorCode.SIZE_NOT_FOUND, "Size not found");
         repository.softDeleteSize(id, support.adminId());
     }
 
@@ -69,7 +70,7 @@ public class SizeColorService {
 
     public ColorOption getColor(UUID id) {
         ColorOption color = repository.findColorById(id);
-        support.require(color != null, "Color not found");
+        support.requireFound(color != null, ErrorCode.COLOR_NOT_FOUND, "Color not found");
         return color;
     }
 
@@ -77,7 +78,7 @@ public class SizeColorService {
     public UUID createColor(ColorRequest request) {
         UUID id = UUID.randomUUID();
         String name = support.trimRequired(request.name(), "Color name");
-        support.require(!repository.colorNameExists(name, null), "Color already exists");
+        support.requireUnique(!repository.colorNameExists(name, null), ErrorCode.COLOR_ALREADY_EXISTS, "Color already exists");
         repository.insertColor(id, name, support.trimToNull(request.colorCode()),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
                 support.nz(request.sortOrder()), support.adminId());
@@ -86,9 +87,9 @@ public class SizeColorService {
 
     @Transactional
     public void updateColor(UUID id, ColorRequest request) {
-        support.require(repository.findColorById(id) != null, "Color not found");
+        support.requireFound(repository.findColorById(id) != null, ErrorCode.COLOR_NOT_FOUND, "Color not found");
         String name = support.trimRequired(request.name(), "Color name");
-        support.require(!repository.colorNameExists(name, id), "Color already exists");
+        support.requireUnique(!repository.colorNameExists(name, id), ErrorCode.COLOR_ALREADY_EXISTS, "Color already exists");
         repository.updateColor(id, name, support.trimToNull(request.colorCode()),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
                 support.nz(request.sortOrder()), support.adminId());
@@ -96,7 +97,7 @@ public class SizeColorService {
 
     @Transactional
     public void deleteColor(UUID id) {
-        support.require(repository.findColorById(id) != null, "Color not found");
+        support.requireFound(repository.findColorById(id) != null, ErrorCode.COLOR_NOT_FOUND, "Color not found");
         repository.softDeleteColor(id, support.adminId());
     }
 }

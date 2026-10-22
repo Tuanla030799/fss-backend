@@ -10,5 +10,5 @@ public record ProductDetail(UUID id, UUID categoryId, String categoryName, UUID 
                             String brandSizeGuideUrl,
                             String gender, String name, String slug,
                             String shortDescription, String descriptionJson, String descriptionHtml, String status, Boolean isFeatured,
-                            Integer featuredOrder, OffsetDateTime createdAt,
+                            Integer featuredOrder, OffsetDateTime createdAt, OffsetDateTime updatedAt,
                             List<ProductImage> images, List<ProductVariant> variants, List<Sku> skus) {}

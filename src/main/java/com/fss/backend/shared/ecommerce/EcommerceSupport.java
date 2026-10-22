@@ -3,6 +3,7 @@ package com.fss.backend.shared.ecommerce;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fss.backend.auth.CurrentAdmin;
 import com.fss.backend.common.ApiException;
+import com.fss.backend.common.ErrorCode;
 import com.fss.backend.common.PageResult;
 import com.fss.backend.file.FileAssetRepository;
 import com.fss.backend.file.FileUrlService;
@@ -38,8 +39,8 @@ public class EcommerceSupport {
     public void activateFile(UUID fileId) {
         if (fileId == null) return;
         switch (fileAssetRepository.activate(fileId, adminId())) {
-            case NOT_FOUND -> throw new ApiException("File not found: " + fileId);
-            case UNAVAILABLE -> throw new ApiException("File is no longer available, please re-upload: " + fileId);
+            case NOT_FOUND -> throw new ApiException(ErrorCode.FILE_NOT_FOUND, "File not found: " + fileId);
+            case UNAVAILABLE -> throw new ApiException(ErrorCode.FILE_UNAVAILABLE, "File is no longer available, please re-upload: " + fileId);
             default -> { }
         }
     }
@@ -63,7 +64,7 @@ public class EcommerceSupport {
     public String normalizeStatusNullable(String status) {
         if (status == null || status.isBlank()) return null;
         String normalized = status.trim().toUpperCase();
-        require(Set.of(ACTIVE, INACTIVE).contains(normalized), "Status must be ACTIVE or INACTIVE");
+        require(Set.of(ACTIVE, INACTIVE).contains(normalized), ErrorCode.VALIDATION_ERROR, "Status must be ACTIVE or INACTIVE");
         return normalized;
     }
 
@@ -75,7 +76,7 @@ public class EcommerceSupport {
     public String normalizeProductStatusNullable(String status) {
         if (status == null || status.isBlank()) return null;
         String normalized = status.trim().toUpperCase();
-        require(PRODUCT_STATUSES.contains(normalized), "Product status must be ACTIVE, INACTIVE or DRAFT");
+        require(PRODUCT_STATUSES.contains(normalized), ErrorCode.VALIDATION_ERROR, "Product status must be ACTIVE, INACTIVE or DRAFT");
         return normalized;
     }
 
@@ -86,14 +87,14 @@ public class EcommerceSupport {
 
     public String normalizeProductStatusRequired(String status) {
         String normalized = normalizeProductStatusNullable(status);
-        require(normalized != null, "Status is required");
+        require(normalized != null, ErrorCode.VALIDATION_ERROR, "Status is required");
         return normalized;
     }
 
     public String normalizeProductGenderNullable(String gender) {
         if (gender == null || gender.isBlank()) return null;
         String normalized = gender.trim().toUpperCase();
-        require(PRODUCT_GENDERS.contains(normalized), "Product gender must be MALE, FEMALE or UNISEX");
+        require(PRODUCT_GENDERS.contains(normalized), ErrorCode.VALIDATION_ERROR, "Product gender must be MALE, FEMALE or UNISEX");
         return normalized;
     }
 
@@ -105,19 +106,19 @@ public class EcommerceSupport {
     public String normalizeOrderStatusNullable(String status) {
         if (status == null || status.isBlank()) return null;
         String normalized = status.trim().toUpperCase();
-        require(ORDER_STATUSES.contains(normalized), "Order status is invalid");
+        require(ORDER_STATUSES.contains(normalized), ErrorCode.VALIDATION_ERROR, "Order status is invalid");
         return normalized;
     }
 
     public String normalizeOrderStatusRequired(String status) {
         String normalized = normalizeOrderStatusNullable(status);
-        require(normalized != null, "Order status is required");
+        require(normalized != null, ErrorCode.VALIDATION_ERROR, "Order status is required");
         return normalized;
     }
 
     public String discountType(String value) {
         String normalized = value.trim().toUpperCase();
-        require(Set.of("PERCENT", "FIXED").contains(normalized), "discountType must be PERCENT or FIXED");
+        require(Set.of("PERCENT", "FIXED").contains(normalized), ErrorCode.VALIDATION_ERROR, "discountType must be PERCENT or FIXED");
         return normalized;
     }
 
@@ -156,7 +157,7 @@ public class EcommerceSupport {
 
     public String trimRequired(String value, String field) {
         String trimmed = trimToNull(value);
-        require(trimmed != null, field + " is required");
+        require(trimmed != null, ErrorCode.VALIDATION_ERROR, field + " is required");
         return trimmed;
     }
 
@@ -177,5 +178,20 @@ public class EcommerceSupport {
 
     public void require(boolean ok, String message) {
         if (!ok) throw new ApiException(message);
+    }
+
+    /** 400 with a specific code: the request is well-formed but invalid (bad value, unknown referenced id, rule broken). */
+    public void require(boolean ok, ErrorCode code, String message) {
+        if (!ok) throw new ApiException(code, message);
+    }
+
+    /** 404: the resource addressed by the request path does not exist. */
+    public void requireFound(boolean found, ErrorCode code, String message) {
+        if (!found) throw ApiException.notFound(code, message);
+    }
+
+    /** 409: a unique value (slug, code, email, ...) is already taken. */
+    public void requireUnique(boolean unique, ErrorCode code, String message) {
+        if (!unique) throw ApiException.conflict(code, message);
     }
 }

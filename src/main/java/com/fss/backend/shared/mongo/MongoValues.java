@@ -1,6 +1,7 @@
 package com.fss.backend.shared.mongo;
 
 import com.fss.backend.common.ApiException;
+import com.fss.backend.common.ErrorCode;
 import org.bson.types.Decimal128;
 import org.springframework.data.mongodb.core.query.Criteria;
 
@@ -52,7 +53,7 @@ public final class MongoValues {
         }
         BigDecimal scaled = value.setScale(2, RoundingMode.HALF_UP);
         if (scaled.abs().compareTo(MAX_MONEY) > 0) {
-            throw new ApiException("Amount is too large");
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "Amount is too large");
         }
         return scaled;
     }

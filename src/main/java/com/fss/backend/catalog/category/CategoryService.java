@@ -1,5 +1,6 @@
 package com.fss.backend.catalog.category;
 
+import com.fss.backend.common.ErrorCode;
 import com.fss.backend.common.PageResult;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.springframework.stereotype.Service;
@@ -42,7 +43,7 @@ public class CategoryService {
 
     @Transactional
     public void updateCategory(UUID id, CategoryRequest request) {
-        support.require(repository.findCategoryById(id) != null, "Category not found");
+        support.requireFound(repository.findCategoryById(id) != null, ErrorCode.CATEGORY_NOT_FOUND, "Category not found");
         String slug = uniqueSlug(request.slug(), request.name(), id);
         repository.updateCategory(id, request.parentId(), request.name().trim(), slug, request.description(),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE), support.nz(request.sortOrder()), support.adminId());
@@ -50,13 +51,13 @@ public class CategoryService {
 
     @Transactional
     public void deleteCategory(UUID id) {
-        support.require(repository.findCategoryById(id) != null, "Category not found");
+        support.requireFound(repository.findCategoryById(id) != null, ErrorCode.CATEGORY_NOT_FOUND, "Category not found");
         repository.softDeleteCategory(id, support.adminId());
     }
 
     private String uniqueSlug(String slug, String name, UUID exclude) {
         String normalized = support.uniqueSlug(slug, name);
-        support.require(!repository.slugExists(normalized, exclude), "Category slug already exists");
+        support.requireUnique(!repository.slugExists(normalized, exclude), ErrorCode.SLUG_ALREADY_EXISTS, "Category slug already exists");
         return normalized;
     }
 }

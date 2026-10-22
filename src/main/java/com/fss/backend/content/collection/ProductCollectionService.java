@@ -2,6 +2,7 @@ package com.fss.backend.content.collection;
 
 import com.fss.backend.catalog.product.ProductRepository;
 import com.fss.backend.catalog.product.ProductSummary;
+import com.fss.backend.common.ErrorCode;
 import com.fss.backend.common.PageResult;
 import com.fss.backend.content.html.HtmlContentImageUsageService;
 import com.fss.backend.content.html.HtmlSanitizerService;
@@ -74,7 +75,7 @@ public class ProductCollectionService {
     @Transactional
     public void updateCollection(UUID id, ProductCollectionRequest request) {
         ProductCollection existing = repository.findCollectionById(id);
-        support.require(existing != null, "Collection not found");
+        support.requireFound(existing != null, ErrorCode.COLLECTION_NOT_FOUND, "Collection not found");
         support.activateFile(request.fileId());
         String excerpt = collectionExcerpt(request);
         String descriptionHtml = sanitizeCollectionDescription(request);
@@ -90,14 +91,14 @@ public class ProductCollectionService {
     @Transactional
     public void deleteCollection(UUID id) {
         ProductCollection existing = repository.findCollectionById(id);
-        support.require(existing != null, "Collection not found");
+        support.requireFound(existing != null, ErrorCode.COLLECTION_NOT_FOUND, "Collection not found");
         repository.softDeleteCollection(id, support.adminId());
         fileReferenceService.releaseFile(existing.fileId());
         fileReferenceService.releaseRemovedHtmlImages(existing.descriptionHtml(), null);
     }
 
     private ProductCollectionDetail collectionDetail(ProductCollection collection, boolean publicOnly, int page, int limit) {
-        support.require(collection != null, "Collection not found");
+        support.requireFound(collection != null, ErrorCode.COLLECTION_NOT_FOUND, "Collection not found");
         ProductCollection normalized = withCollectionUrl(collection);
         int safeLimit = support.safeLimit(limit);
         List<ProductSummary> products = repository.listCollectionProducts(collection.id(), publicOnly, safeLimit, support.offset(page, safeLimit))
@@ -107,7 +108,7 @@ public class ProductCollectionService {
         return new ProductCollectionDetail(normalized.id(), normalized.name(), normalized.slug(),
                 normalized.excerpt(), normalized.descriptionHtml(),
                 normalized.fileId(), normalized.imageUrl(), normalized.status(),
-                normalized.sortOrder(), normalized.productCount(), normalized.createdAt(), pagedProducts);
+                normalized.sortOrder(), normalized.productCount(), normalized.createdAt(), normalized.updatedAt(), pagedProducts);
     }
 
     private String collectionExcerpt(ProductCollectionRequest request) {
@@ -124,7 +125,7 @@ public class ProductCollectionService {
         java.util.LinkedHashMap<UUID, CollectionDocument.Member> members = new java.util.LinkedHashMap<>();
         java.time.Instant now = java.time.Instant.now();
         for (CollectionProductRequest product : products) {
-            support.require(productRepository.existsLive(product.productId()), "Product not found: " + product.productId());
+            support.require(productRepository.existsLive(product.productId()), ErrorCode.PRODUCT_NOT_FOUND, "Product not found: " + product.productId());
             CollectionDocument.Member previous = members.get(product.productId());
             members.put(product.productId(), new CollectionDocument.Member(product.productId(), support.nz(product.sortOrder()),
                     previous == null ? now : previous.createdAt()));
@@ -134,7 +135,7 @@ public class ProductCollectionService {
 
     private String uniqueSlug(String slug, String name, UUID exclude) {
         String normalized = support.uniqueSlug(slug, name);
-        support.require(!repository.slugExists(normalized, exclude), "Collection slug already exists");
+        support.requireUnique(!repository.slugExists(normalized, exclude), ErrorCode.SLUG_ALREADY_EXISTS, "Collection slug already exists");
         return normalized;
     }
 
@@ -143,13 +144,13 @@ public class ProductCollectionService {
                 collection.name(), collection.slug(), collection.excerpt(),
                 htmlContentImageUsageService.rewriteForOutput(collection.descriptionHtml()),
                 collection.fileId(), support.publicUrl(collection.imageUrl()), collection.status(), collection.sortOrder(),
-                collection.productCount(), collection.createdAt());
+                collection.productCount(), collection.createdAt(), collection.updatedAt());
     }
 
     private ProductSummary withProductUrl(ProductSummary product) {
         return product == null ? null : new ProductSummary(product.id(), product.categoryId(),
                 product.categoryName(), product.brandId(), product.brandName(), product.brandSlug(), support.publicUrl(product.brandSizeGuideUrl()), product.gender(), product.name(), product.slug(), product.shortDescription(), product.status(),
                 product.isFeatured(), product.featuredOrder(), product.minPrice(), product.minSalePrice(), product.totalStock(),
-                product.primaryFileId(), support.publicUrl(product.primaryImageUrl()), product.createdAt());
+                product.primaryFileId(), support.publicUrl(product.primaryImageUrl()), product.createdAt(), product.updatedAt());
     }
 }

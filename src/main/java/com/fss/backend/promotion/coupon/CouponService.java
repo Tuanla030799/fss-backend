@@ -1,5 +1,7 @@
 package com.fss.backend.promotion.coupon;
 
+import com.fss.backend.common.ApiException;
+import com.fss.backend.common.ErrorCode;
 import com.fss.backend.common.PageResult;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.springframework.stereotype.Service;
@@ -7,13 +9,18 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
 public class CouponService {
+    private static final String USAGE_LIMIT_REACHED = "Mã giảm giá đã hết lượt sử dụng.";
+
     private final CouponRepository repository;
     private final EcommerceSupport support;
 
@@ -32,7 +39,7 @@ public class CouponService {
     @Transactional
     public UUID createCoupon(CouponRequest request) {
         UUID id = UUID.randomUUID();
-        support.require(!repository.codeExists(request.code(), null), "Coupon code already exists");
+        support.requireUnique(!repository.codeExists(request.code(), null), ErrorCode.COUPON_CODE_ALREADY_EXISTS, "Coupon code already exists");
         repository.insertCoupon(id, request.code(), request.name(), support.discountType(request.discountType()), request.discountValue(),
                 request.maxDiscount(), request.minOrderAmount(), request.usageLimit(), request.startsAt(), request.endsAt(),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE), support.adminId());
@@ -41,8 +48,8 @@ public class CouponService {
 
     @Transactional
     public void updateCoupon(UUID id, CouponRequest request) {
-        support.require(repository.findCouponById(id) != null, "Coupon not found");
-        support.require(!repository.codeExists(request.code(), id), "Coupon code already exists");
+        support.requireFound(repository.findCouponById(id) != null, ErrorCode.COUPON_NOT_FOUND, "Coupon not found");
+        support.requireUnique(!repository.codeExists(request.code(), id), ErrorCode.COUPON_CODE_ALREADY_EXISTS, "Coupon code already exists");
         repository.updateCoupon(id, request.code(), request.name(), support.discountType(request.discountType()), request.discountValue(),
                 request.maxDiscount(), request.minOrderAmount(), request.usageLimit(), request.startsAt(), request.endsAt(),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE), support.adminId());
@@ -50,26 +57,25 @@ public class CouponService {
 
     @Transactional
     public void deleteCoupon(UUID id) {
-        support.require(repository.findCouponById(id) != null, "Coupon not found");
+        support.requireFound(repository.findCouponById(id) != null, ErrorCode.COUPON_NOT_FOUND, "Coupon not found");
         repository.softDeleteCoupon(id, support.adminId());
     }
 
+    /** Checkout preview: an unusable code is answered with {@code valid=false} and the reason, never with an error. */
     public ValidateCouponResponse validateCoupon(ValidateCouponRequest request) {
-        Coupon coupon = requireValidCoupon(request.code(), request.subtotalAmount());
-        BigDecimal discount = calculateDiscount(coupon, request.subtotalAmount());
-        return new ValidateCouponResponse(coupon.id(), coupon.code(), discount,
-                request.subtotalAmount().subtract(discount).max(BigDecimal.ZERO));
+        BigDecimal subtotal = request.subtotalAmount();
+        Coupon coupon = findByCode(request.code());
+        Rejection rejection = rejection(coupon, subtotal);
+        if (rejection != null) return ValidateCouponResponse.invalid(rejection, subtotal);
+        BigDecimal discount = calculateDiscount(coupon, subtotal);
+        return ValidateCouponResponse.valid(coupon, discount, subtotal.subtract(discount).max(BigDecimal.ZERO));
     }
 
+    /** The coupon to apply to an order; fails with the same code and message that {@link #validateCoupon} reports. */
     public Coupon requireValidCoupon(String code, BigDecimal subtotal) {
-        Coupon coupon = repository.findCouponByCode(code);
-        support.require(coupon != null && EcommerceSupport.ACTIVE.equals(coupon.status()), "Coupon is invalid");
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        support.require(coupon.startsAt() == null || !coupon.startsAt().isAfter(now), "Coupon has not started");
-        support.require(coupon.endsAt() == null || !coupon.endsAt().isBefore(now), "Coupon has expired");
-        support.require(coupon.usageLimit() == null || coupon.usedCount() < coupon.usageLimit(), "Coupon usage limit reached");
-        support.require(coupon.minOrderAmount() == null || subtotal.compareTo(coupon.minOrderAmount()) >= 0,
-                "Order amount is below coupon minimum");
+        Coupon coupon = findByCode(code);
+        Rejection rejection = rejection(coupon, subtotal);
+        if (rejection != null) throw new ApiException(rejection.code(), rejection.message());
         return coupon;
     }
 
@@ -83,6 +89,44 @@ public class CouponService {
 
     /** Consumes one coupon use atomically; fails (and rolls back the caller's transaction) once the limit is reached. */
     public void incrementCouponUsed(UUID id) {
-        support.require(repository.tryConsumeUsage(id), "Coupon usage limit reached");
+        support.require(repository.tryConsumeUsage(id), ErrorCode.COUPON_USAGE_LIMIT_REACHED, USAGE_LIMIT_REACHED);
     }
+
+    private Coupon findByCode(String code) {
+        // Customers often paste codes with surrounding spaces; the lookup itself is case-insensitive.
+        return code == null ? null : repository.findCouponByCode(code.trim());
+    }
+
+    /** Why the coupon cannot be used for this subtotal (messages are shown to customers), or null if it can. */
+    private Rejection rejection(Coupon coupon, BigDecimal subtotal) {
+        if (coupon == null) return new Rejection(ErrorCode.COUPON_NOT_FOUND, "Mã giảm giá không tồn tại.");
+        if (!EcommerceSupport.ACTIVE.equals(coupon.status())) {
+            return new Rejection(ErrorCode.COUPON_INVALID, "Mã giảm giá không còn hiệu lực.");
+        }
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        if (coupon.startsAt() != null && coupon.startsAt().isAfter(now)) {
+            return new Rejection(ErrorCode.COUPON_NOT_STARTED, "Mã giảm giá chưa đến thời gian áp dụng.");
+        }
+        if (coupon.endsAt() != null && coupon.endsAt().isBefore(now)) {
+            return new Rejection(ErrorCode.COUPON_EXPIRED, "Mã giảm giá đã hết hạn.");
+        }
+        if (coupon.usageLimit() != null && coupon.usedCount() >= coupon.usageLimit()) {
+            return new Rejection(ErrorCode.COUPON_USAGE_LIMIT_REACHED, USAGE_LIMIT_REACHED);
+        }
+        if (coupon.minOrderAmount() != null && subtotal.compareTo(coupon.minOrderAmount()) < 0) {
+            return new Rejection(ErrorCode.COUPON_MIN_SUBTOTAL,
+                    "Đơn hàng cần tối thiểu " + formatVnd(coupon.minOrderAmount()) + " để dùng mã này.");
+        }
+        return null;
+    }
+
+    /** Vietnamese money format: 500000.00 becomes "500.000 đ". */
+    static String formatVnd(BigDecimal amount) {
+        DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.ROOT);
+        symbols.setGroupingSeparator('.');
+        symbols.setDecimalSeparator(',');
+        return new DecimalFormat("#,##0.##", symbols).format(amount) + " đ";
+    }
+
+    record Rejection(ErrorCode code, String message) {}
 }

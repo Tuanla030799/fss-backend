@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.UUID;
@@ -59,11 +60,18 @@ public class JwtProvider {
     public String newRefreshToken(UUID adminId) {
         Instant now = Instant.now();
         return Jwts.builder()
+                // Stored tokens are unique: without a random id, two tokens issued in the same second (login then
+                // refresh, a double submit) would be identical and the second insert would fail.
+                .id(UUID.randomUUID().toString())
                 .subject(adminId.toString())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusSeconds(refreshDays * 24 * 3600)))
                 .signWith(key)
                 .compact();
+    }
+
+    public Duration refreshTokenTtl() {
+        return Duration.ofDays(refreshDays);
     }
 
     public UUID parseSubject(String token) {

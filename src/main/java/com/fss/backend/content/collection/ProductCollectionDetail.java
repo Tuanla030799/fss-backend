@@ -8,5 +8,5 @@ import java.util.UUID;
 
 public record ProductCollectionDetail(UUID id, String name, String slug, String excerpt, String descriptionHtml,
                                       UUID fileId, String imageUrl, String status, Integer sortOrder,
-                                      Integer productCount, OffsetDateTime createdAt,
+                                      Integer productCount, OffsetDateTime createdAt, OffsetDateTime updatedAt,
                                       PageResult<ProductSummary> products) {}

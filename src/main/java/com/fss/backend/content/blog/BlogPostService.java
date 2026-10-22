@@ -1,5 +1,6 @@
 package com.fss.backend.content.blog;
 
+import com.fss.backend.common.ErrorCode;
 import com.fss.backend.common.PageResult;
 import com.fss.backend.content.html.HtmlContentImageUsageService;
 import com.fss.backend.content.html.HtmlSanitizerService;
@@ -44,7 +45,7 @@ public class BlogPostService {
 
     public BlogPost getPublicPost(String slug) {
         BlogPost post = repository.findPostBySlug(slug, true);
-        support.require(post != null, "Blog post not found");
+        support.requireFound(post != null, ErrorCode.BLOG_POST_NOT_FOUND, "Blog post not found");
         return withCoverUrl(post);
     }
 
@@ -58,7 +59,7 @@ public class BlogPostService {
 
     public BlogPost getAdminPost(UUID id) {
         BlogPost post = repository.findPostById(id);
-        support.require(post != null, "Blog post not found");
+        support.requireFound(post != null, ErrorCode.BLOG_POST_NOT_FOUND, "Blog post not found");
         return withCoverUrl(post);
     }
 
@@ -79,7 +80,7 @@ public class BlogPostService {
     @Transactional
     public void updatePost(UUID id, BlogPostRequest request) {
         BlogPost existing = repository.findPostById(id);
-        support.require(existing != null, "Blog post not found");
+        support.requireFound(existing != null, ErrorCode.BLOG_POST_NOT_FOUND, "Blog post not found");
         support.activateFile(request.coverFileId());
         String status = normalizePostStatusDefault(request.status());
         ContentPayload content = contentPayload(request);
@@ -95,7 +96,7 @@ public class BlogPostService {
     @Transactional
     public void deletePost(UUID id) {
         BlogPost existing = repository.findPostById(id);
-        support.require(existing != null, "Blog post not found");
+        support.requireFound(existing != null, ErrorCode.BLOG_POST_NOT_FOUND, "Blog post not found");
         repository.softDeletePost(id, support.adminId());
         fileReferenceService.releaseFile(existing.coverFileId());
         fileReferenceService.releaseRemovedHtmlImages(existing.contentHtml(), null);
@@ -109,7 +110,7 @@ public class BlogPostService {
     private String normalizePostStatusNullable(String status) {
         if (status == null || status.isBlank()) return null;
         String normalized = status.trim().toUpperCase();
-        support.require(POST_STATUSES.contains(normalized), "Blog status must be ACTIVE, INACTIVE or DRAFT");
+        support.require(POST_STATUSES.contains(normalized), ErrorCode.VALIDATION_ERROR, "Blog status must be ACTIVE, INACTIVE or DRAFT");
         return normalized;
     }
 
@@ -120,14 +121,14 @@ public class BlogPostService {
 
     private String uniqueSlug(String slug, String title, UUID exclude) {
         String normalized = support.uniqueSlug(slug, title);
-        support.require(!repository.slugExists(normalized, exclude), "Blog slug already exists");
+        support.requireUnique(!repository.slugExists(normalized, exclude), ErrorCode.SLUG_ALREADY_EXISTS, "Blog slug already exists");
         return normalized;
     }
 
     private BlogPost withCoverUrl(BlogPost post) {
         return post == null ? null : new BlogPost(post.id(), post.title(), post.slug(),
                 post.excerpt(), "{}", htmlContentImageUsageService.rewriteForOutput(post.contentHtml()), post.coverFileId(),
-                support.publicUrl(post.coverImageUrl()), post.status(), post.publishedAt(), post.createdAt());
+                support.publicUrl(post.coverImageUrl()), post.status(), post.publishedAt(), post.createdAt(), post.updatedAt());
     }
 
     private ContentPayload contentPayload(BlogPostRequest request) {

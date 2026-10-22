@@ -1,5 +1,8 @@
 package com.fss.backend.auth;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fss.backend.common.ApiErrorResponse;
+import com.fss.backend.common.ErrorCode;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -23,9 +26,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String ADMIN_AUTH_PATH = "/api/admin/auth/";
 
     private final JwtProvider jwtProvider;
+    private final ObjectMapper objectMapper;
 
-    public JwtAuthenticationFilter(JwtProvider jwtProvider) {
+    public JwtAuthenticationFilter(JwtProvider jwtProvider, ObjectMapper objectMapper) {
         this.jwtProvider = jwtProvider;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -49,16 +54,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().setAuthentication(auth);
             } catch (IllegalArgumentException | JwtException ignored) {
                 SecurityContextHolder.clearContext();
-                writeUnauthorized(response, "Token invalid or expired");
+                writeUnauthorized(response);
                 return;
             }
         }
         filterChain.doFilter(request, response);
     }
 
-    private void writeUnauthorized(HttpServletResponse response, String message) throws IOException {
+    private void writeUnauthorized(HttpServletResponse response) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.getWriter().write("{\"success\":false,\"message\":\"" + message + "\",\"data\":null}");
+        response.setCharacterEncoding("UTF-8");
+        objectMapper.writeValue(response.getWriter(), ApiErrorResponse.of(ErrorCode.AUTH_TOKEN_INVALID, "Token invalid or expired"));
     }
 }

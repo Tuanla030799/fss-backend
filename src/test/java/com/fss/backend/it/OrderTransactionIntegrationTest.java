@@ -21,6 +21,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -51,7 +52,8 @@ class OrderTransactionIntegrationTest extends MongoIntegrationTest {
 
         mvc.perform(jsonBody(post("/api/orders"), order(List.of(item(fixture.skuA, 2), item(fixture.skuB, 2)), code)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Not enough stock for SKU: " + fixture.skuBCode));
+                .andExpect(jsonPath("$.code").value("OUT_OF_STOCK"))
+                .andExpect(jsonPath("$.message").value(containsString("không đủ số lượng trong kho")));
 
         assertEquals(10, stock(fixture.skuA), "first SKU decrement must be rolled back");
         assertEquals(1, stock(fixture.skuB));

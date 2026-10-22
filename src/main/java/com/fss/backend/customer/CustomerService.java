@@ -1,5 +1,6 @@
 package com.fss.backend.customer;
 
+import com.fss.backend.common.ErrorCode;
 import com.fss.backend.common.PageResult;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.springframework.stereotype.Service;
@@ -27,7 +28,7 @@ public class CustomerService {
 
     public Customer getCustomer(UUID id) {
         Customer customer = repository.findCustomerById(id);
-        support.require(customer != null, "Customer not found");
+        support.requireFound(customer != null, ErrorCode.CUSTOMER_NOT_FOUND, "Customer not found");
         return customer;
     }
 
@@ -42,7 +43,7 @@ public class CustomerService {
 
     @Transactional
     public void updateCustomer(UUID id, CustomerRequest request) {
-        support.require(repository.findCustomerById(id) != null, "Customer not found");
+        support.requireFound(repository.findCustomerById(id) != null, ErrorCode.CUSTOMER_NOT_FOUND, "Customer not found");
         validateUnique(request.email(), request.phone(), id);
         repository.updateCustomer(id, request.fullName(), normalizeBlank(request.email()), request.phone(),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE));
@@ -50,15 +51,15 @@ public class CustomerService {
 
     @Transactional
     public void deleteCustomer(UUID id) {
-        support.require(repository.findCustomerById(id) != null, "Customer not found");
+        support.requireFound(repository.findCustomerById(id) != null, ErrorCode.CUSTOMER_NOT_FOUND, "Customer not found");
         repository.softDeleteCustomer(id);
     }
 
     private void validateUnique(String email, String phone, UUID excludeId) {
         if (email != null && !email.isBlank()) {
-            support.require(!repository.emailExists(email, excludeId), "Email already exists");
+            support.requireUnique(!repository.emailExists(email, excludeId), ErrorCode.EMAIL_ALREADY_EXISTS, "Email already exists");
         }
-        support.require(!repository.phoneExists(phone, excludeId), "Phone already exists");
+        support.requireUnique(!repository.phoneExists(phone, excludeId), ErrorCode.PHONE_ALREADY_EXISTS, "Phone already exists");
     }
 
     private String normalizeBlank(String value) {

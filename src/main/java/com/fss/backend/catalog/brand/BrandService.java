@@ -1,5 +1,6 @@
 package com.fss.backend.catalog.brand;
 
+import com.fss.backend.common.ErrorCode;
 import com.fss.backend.common.PageResult;
 import com.fss.backend.file.FileReferenceService;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
@@ -30,7 +31,7 @@ public class BrandService {
 
     public Brand getPublicBrand(String slug) {
         Brand brand = repository.findBrandBySlug(slug);
-        support.require(brand != null && EcommerceSupport.ACTIVE.equals(brand.status()), "Brand not found");
+        support.requireFound(brand != null && EcommerceSupport.ACTIVE.equals(brand.status()), ErrorCode.BRAND_NOT_FOUND, "Brand not found");
         return withBrandUrl(brand);
     }
 
@@ -44,7 +45,7 @@ public class BrandService {
 
     public Brand getAdminBrand(UUID id) {
         Brand brand = repository.findBrandById(id);
-        support.require(brand != null, "Brand not found");
+        support.requireFound(brand != null, ErrorCode.BRAND_NOT_FOUND, "Brand not found");
         return withBrandUrl(brand);
     }
 
@@ -63,7 +64,7 @@ public class BrandService {
     @Transactional
     public void updateBrand(UUID id, BrandRequest request) {
         Brand existing = repository.findBrandById(id);
-        support.require(existing != null, "Brand not found");
+        support.requireFound(existing != null, ErrorCode.BRAND_NOT_FOUND, "Brand not found");
         support.activateFile(request.fileId());
         support.activateFile(request.fileSizeId());
         repository.updateBrand(id, request.name().trim(), uniqueSlug(request.slug(), request.name(), id),
@@ -77,7 +78,7 @@ public class BrandService {
     @Transactional
     public void deleteBrand(UUID id) {
         Brand existing = repository.findBrandById(id);
-        support.require(existing != null, "Brand not found");
+        support.requireFound(existing != null, ErrorCode.BRAND_NOT_FOUND, "Brand not found");
         repository.softDeleteBrand(id, support.adminId());
         fileReferenceService.releaseFile(existing.fileId());
         fileReferenceService.releaseFile(existing.fileSizeId());
@@ -85,7 +86,7 @@ public class BrandService {
 
     private String uniqueSlug(String slug, String name, UUID exclude) {
         String normalized = support.uniqueSlug(slug, name);
-        support.require(!repository.slugExists(normalized, exclude), "Brand slug already exists");
+        support.requireUnique(!repository.slugExists(normalized, exclude), ErrorCode.SLUG_ALREADY_EXISTS, "Brand slug already exists");
         return normalized;
     }
 

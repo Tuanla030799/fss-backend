@@ -15,6 +15,9 @@ import org.bson.Document;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
+import org.springframework.data.mongodb.core.aggregation.GroupOperation;
+import org.springframework.data.mongodb.core.query.Collation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -22,9 +25,11 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -49,6 +54,9 @@ import static com.fss.backend.shared.mongo.MongoValues.live;
 @Repository
 public class ProductRepository {
     private static final String ACTIVE = "ACTIVE";
+    private static final Sort NEWEST_FIRST = Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("_id"));
+    /** Vietnamese alphabetical order ("Đ" after "D", accents after the base letter), numbers compared by value. */
+    private static final Collation VIETNAMESE = Collation.of("vi").numericOrdering(true);
 
     private final MongoTemplate mongo;
     private final CategoryRepository categories;
@@ -67,14 +75,19 @@ public class ProductRepository {
 
     // ---------------------------------------------------------------- products
 
-    public List<ProductSummary> listProducts(ProductFilter filter, int limit, int offset) {
+    /** One page of the filtered products; the whole filtered list is sorted before paging, ties go newest first. */
+    public List<ProductSummary> listProducts(ProductFilter filter, ProductSort sort, int limit, int offset) {
         Criteria criteria = filterCriteria(filter);
         if (criteria == null) return List.of();
-        Sort sort = filter.featuredOnly()
-                ? Sort.by(Sort.Order.asc("featuredOrder"), Sort.Order.desc("createdAt"), Sort.Order.desc("_id"))
-                : Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("_id"));
-        List<ProductDocument> page = mongo.find(Query.query(criteria).with(sort).skip(offset).limit(limit), ProductDocument.class);
-        return summaries(page);
+        List<ProductDocument> page = switch (sort) {
+            case NEWEST -> mongo.find(Query.query(criteria).with(NEWEST_FIRST).skip(offset).limit(limit), ProductDocument.class);
+            case NAME_ASC -> mongo.find(Query.query(criteria).with(Sort.by(Sort.Order.asc("name")).and(NEWEST_FIRST))
+                    .collation(VIETNAMESE).skip(offset).limit(limit), ProductDocument.class);
+            case FEATURED -> aggregatePage(criteria, featuredFirst(), limit, offset);
+            case PRICE_ASC, PRICE_DESC ->
+                    aggregatePage(criteria, byLowestPrice(sort == ProductSort.PRICE_ASC, filter.publicOnly()), limit, offset);
+        };
+        return summaries(page, filter.publicOnly());
     }
 
     public long countProducts(ProductFilter filter) {
@@ -85,10 +98,7 @@ public class ProductRepository {
     /** Live products among {@code ids}, restricted to publicly visible ones when {@code publicOnly}. */
     public List<ProductDocument> findLiveByIds(Collection<UUID> ids, boolean publicOnly) {
         if (ids.isEmpty()) return List.of();
-        ProductFilter filter = new ProductFilter(publicOnly, null, List.of(), null, List.of(), null, List.of(), null,
-                List.of(), List.of(), null, null, false);
-        Criteria criteria = filterCriteria(filter);
-        if (criteria == null) return List.of();
+        Criteria criteria = filterCriteria(ProductFilter.none(publicOnly));
         return mongo.find(Query.query(new Criteria().andOperator(criteria, Criteria.where("_id").in(ids))), ProductDocument.class);
     }
 
@@ -102,22 +112,15 @@ public class ProductRepository {
 
     public ProductSummary findProductSummaryById(UUID id) {
         ProductDocument doc = findLive(id);
-        return doc == null ? null : summaries(List.of(doc)).get(0);
+        return doc == null ? null : summaries(List.of(doc), false).get(0);
     }
 
     public ProductSummary findProductSummaryBySlug(String slug, boolean publicOnly) {
-        ProductDocument doc = mongo.findOne(Query.query(live().and("slug").is(slug)), ProductDocument.class);
-        if (doc == null) return null;
-        if (publicOnly) {
-            if (!ACTIVE.equals(doc.status())) return null;
-            CategoryDocument category = categories.findAllByIds(List.of(doc.categoryId())).get(doc.categoryId());
-            if (category == null || !ACTIVE.equals(category.status())) return null;
-            if (doc.brandId() != null) {
-                BrandDocument brand = brands.findAllByIds(List.of(doc.brandId())).get(doc.brandId());
-                if (brand != null && (!ACTIVE.equals(brand.status()) || brand.deleted())) return null;
-            }
-        }
-        return summaries(List.of(doc)).get(0);
+        // Same visibility rules as the list (product, category and brand ACTIVE and not deleted): a product that is
+        // not listed cannot be opened by its slug either.
+        Criteria criteria = new Criteria().andOperator(filterCriteria(ProductFilter.none(publicOnly)), Criteria.where("slug").is(slug));
+        ProductDocument doc = mongo.findOne(Query.query(criteria), ProductDocument.class);
+        return doc == null ? null : summaries(List.of(doc), publicOnly).get(0);
     }
 
     public String findProductDescriptionHtml(UUID id) {
@@ -155,6 +158,12 @@ public class ProductRepository {
                 .set("updatedBy", adminId).set("updatedAt", Instant.now()), ProductDocument.class);
     }
 
+    /** Records a change made through a product's variant or SKU endpoints as a change of the product. */
+    public void touchProduct(UUID id, UUID adminId) {
+        mongo.updateFirst(Query.query(live().and("_id").is(id)), new Update().set("updatedBy", adminId)
+                .set("updatedAt", Instant.now()), ProductDocument.class);
+    }
+
     public void softDeleteProduct(UUID id, UUID adminId) {
         Instant now = Instant.now();
         mongo.updateFirst(Query.query(live().and("_id").is(id)), new Update().set("deleted", true).set("deletedAt", now)
@@ -186,8 +195,11 @@ public class ProductRepository {
 
     // ---------------------------------------------------------------- variants
 
-    public List<ProductVariant> listVariants(UUID productId) {
-        Query query = Query.query(live().and("productId").is(productId))
+    /** The product's variants; in public only the ACTIVE ones. */
+    public List<ProductVariant> listVariants(UUID productId, boolean publicOnly) {
+        Criteria criteria = live().and("productId").is(productId);
+        if (publicOnly) criteria = criteria.and("status").is(ACTIVE);
+        Query query = Query.query(criteria)
                 .with(Sort.by(Sort.Order.asc("sortOrder"), Sort.Order.asc("createdAt"), Sort.Order.asc("_id")));
         return toVariants(mongo.find(query, VariantDocument.class));
     }
@@ -218,8 +230,16 @@ public class ProductRepository {
 
     // ---------------------------------------------------------------- skus
 
-    public List<Sku> listSkus(UUID productId) {
-        List<SkuDocument> docs = mongo.find(Query.query(live().and("productId").is(productId)), SkuDocument.class);
+    /** The product's SKUs; in public only the sellable ones (ACTIVE, without variant or with an ACTIVE variant). */
+    public List<Sku> listSkus(UUID productId, boolean publicOnly) {
+        Criteria criteria = live().and("productId").is(productId);
+        if (publicOnly) {
+            List<UUID> activeVariantIds = mongo.findDistinct(Query.query(live().and("productId").is(productId)
+                    .and("status").is(ACTIVE)), "_id", VariantDocument.class, UUID.class);
+            criteria = criteria.and("status").is(ACTIVE)
+                    .orOperator(Criteria.where("variantId").is(null), Criteria.where("variantId").in(activeVariantIds));
+        }
+        List<SkuDocument> docs = mongo.find(Query.query(criteria), SkuDocument.class);
         Map<UUID, SizeDocument> sizes = sizeColors.findSizesByIds(docs.stream().map(SkuDocument::sizeId).filter(Objects::nonNull).collect(Collectors.toSet()));
         return docs.stream()
                 .map(doc -> toSku(doc, sizes.get(doc.sizeId())))
@@ -270,15 +290,19 @@ public class ProductRepository {
 
     // ---------------------------------------------------------------- summary building
 
-    /** Builds summaries in the given order with joined category/brand data, SKU aggregates and primary image path. */
-    public List<ProductSummary> summaries(List<ProductDocument> products) {
+    /**
+     * Builds summaries in the given order with joined category/brand data, SKU aggregates and primary image path. In
+     * public the aggregates only count sellable SKUs (see {@link #skuStages}), so prices and stock match what can be
+     * ordered.
+     */
+    public List<ProductSummary> summaries(List<ProductDocument> products, boolean publicOnly) {
         if (products.isEmpty()) return List.of();
         Set<UUID> productIds = products.stream().map(ProductDocument::id).collect(Collectors.toSet());
         Map<UUID, CategoryDocument> categoryById = categories.findAllByIds(products.stream().map(ProductDocument::categoryId)
                 .filter(Objects::nonNull).collect(Collectors.toSet()));
         Map<UUID, BrandDocument> brandById = brands.findAllByIds(products.stream().map(ProductDocument::brandId)
                 .filter(Objects::nonNull).collect(Collectors.toSet()));
-        Map<UUID, Document> skuStats = skuStats(productIds);
+        Map<UUID, Document> skuStats = skuStats(productIds, publicOnly);
 
         Map<UUID, List<ProductDocument.Image>> orderedImages = new HashMap<>();
         Set<UUID> fileIds = new HashSet<>();
@@ -310,21 +334,102 @@ public class ProductRepository {
                     stats == null ? null : MongoValues.bigDecimal(stats.get("minPrice")),
                     stats == null ? null : MongoValues.bigDecimal(stats.get("minSalePrice")),
                     stats == null ? 0 : ((Number) stats.getOrDefault("totalStock", 0)).intValue(),
-                    primaryFileId, primaryPath, MongoValues.odt(product.createdAt())));
+                    primaryFileId, primaryPath, MongoValues.odt(product.createdAt()), lastUpdated(product, stats)));
         }
         return result;
     }
 
-    private Map<UUID, Document> skuStats(Collection<UUID> productIds) {
-        Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(live().and("productId").in(productIds)),
-                Aggregation.group("productId").min("price").as("minPrice").min("effectivePrice").as("minSalePrice")
-                        .sum("stock").as("totalStock"));
+    /**
+     * The latest change of the product or of one of its counted SKUs: SKU edits (price, stock, status) and orders
+     * update the SKU, while images and variants are saved with the product or touch it ({@link #touchProduct}).
+     */
+    private static OffsetDateTime lastUpdated(ProductDocument product, Document stats) {
+        Instant updatedAt = product.updatedAt() != null ? product.updatedAt() : product.createdAt();
+        if (stats != null && stats.get("updatedAt") instanceof Date skuUpdatedAt
+                && (updatedAt == null || skuUpdatedAt.toInstant().isAfter(updatedAt))) {
+            updatedAt = skuUpdatedAt.toInstant();
+        }
+        return MongoValues.odt(updatedAt);
+    }
+
+    private Map<UUID, Document> skuStats(Collection<UUID> productIds, boolean publicOnly) {
+        GroupOperation group = Aggregation.group("productId").min("price").as("minPrice")
+                .min("effectivePrice").as("minSalePrice").sum("stock").as("totalStock").max("updatedAt").as("updatedAt");
         Map<UUID, Document> stats = new HashMap<>();
-        for (Document row : mongo.aggregate(aggregation, SkuDocument.COLLECTION, Document.class).getMappedResults()) {
+        for (Document row : aggregateSkus(Criteria.where("productId").in(productIds), publicOnly, group)) {
             stats.put((UUID) row.get("_id"), row);
         }
         return stats;
+    }
+
+    /** Products having a SKU that matches {@code criteria} and counts (see {@link #skuStages}). */
+    private Set<UUID> productIdsWithSku(Criteria criteria, boolean publicOnly) {
+        Set<UUID> ids = new LinkedHashSet<>();
+        aggregateSkus(criteria, publicOnly, Aggregation.group("productId")).forEach(row -> ids.add((UUID) row.get("_id")));
+        return ids;
+    }
+
+    private List<Document> aggregateSkus(Criteria criteria, boolean publicOnly, GroupOperation group) {
+        List<AggregationOperation> stages = new ArrayList<>();
+        stages.add(Aggregation.match(criteria));
+        skuStages(publicOnly).forEach(stage -> stages.add(context -> stage));
+        stages.add(group);
+        return mongo.aggregate(Aggregation.newAggregation(stages), SkuDocument.COLLECTION, Document.class).getMappedResults();
+    }
+
+    /**
+     * Stages over {@code skus} keeping the SKUs that count for a product: every live SKU for the admin; in public only
+     * sellable ones, i.e. ACTIVE and either without variant or with a live ACTIVE variant (the same rule orders use).
+     */
+    private static List<Document> skuStages(boolean publicOnly) {
+        if (!publicOnly) return List.of(new Document("$match", new Document("deleted", false)));
+        Document activeVariant = new Document("$elemMatch", new Document("deleted", false).append("status", ACTIVE));
+        return List.of(
+                new Document("$match", new Document("deleted", false).append("status", ACTIVE)),
+                new Document("$lookup", new Document("from", VariantDocument.COLLECTION).append("localField", "variantId")
+                        .append("foreignField", "_id").append("as", "_variant")),
+                new Document("$match", new Document("$or", List.of(new Document("variantId", null),
+                        new Document("_variant", activeVariant)))));
+    }
+
+    // ---------------------------------------------------------------- sorting
+
+    private List<ProductDocument> aggregatePage(Criteria criteria, List<Document> sortStages, int limit, int offset) {
+        List<AggregationOperation> stages = new ArrayList<>();
+        stages.add(Aggregation.match(criteria));
+        sortStages.forEach(stage -> stages.add(context -> stage));
+        stages.add(Aggregation.skip((long) offset));
+        stages.add(Aggregation.limit(limit));
+        // Temporary sort fields are not part of ProductDocument and are ignored when mapping the results.
+        return mongo.aggregate(Aggregation.newAggregation(stages), ProductDocument.COLLECTION, ProductDocument.class)
+                .getMappedResults();
+    }
+
+    /** Featured products first, by featuredOrder; a non-featured product's leftover featuredOrder is ignored. */
+    private static List<Document> featuredFirst() {
+        Document featured = new Document("$eq", List.of("$isFeatured", true));
+        return List.of(
+                new Document("$addFields", new Document("_featured", new Document("$cond", List.of(featured, 1, 0)))
+                        .append("_featuredOrder", new Document("$cond", List.of(featured,
+                                new Document("$ifNull", List.of("$featuredOrder", 0)), 0)))),
+                new Document("$sort", new Document("_featured", -1).append("_featuredOrder", 1)
+                        .append("createdAt", -1).append("_id", -1)));
+    }
+
+    /**
+     * By the lowest selling price (sale price, else price) among the SKUs counted in the summary, i.e. its
+     * {@code minSalePrice}. Products without such a SKU have no price and come last in both directions.
+     */
+    private static List<Document> byLowestPrice(boolean ascending, boolean publicOnly) {
+        List<Document> skuPipeline = new ArrayList<>(skuStages(publicOnly));
+        skuPipeline.add(new Document("$group", new Document("_id", null).append("price", new Document("$min", "$effectivePrice"))));
+        return List.of(
+                new Document("$lookup", new Document("from", SkuDocument.COLLECTION).append("localField", "_id")
+                        .append("foreignField", "productId").append("pipeline", skuPipeline).append("as", "_prices")),
+                new Document("$addFields", new Document("_hasPrice", new Document("$size", "$_prices"))
+                        .append("_price", new Document("$min", "$_prices.price"))),
+                new Document("$sort", new Document("_hasPrice", -1).append("_price", ascending ? 1 : -1)
+                        .append("createdAt", -1).append("_id", -1)));
     }
 
     // ---------------------------------------------------------------- filters
@@ -358,27 +463,29 @@ public class ProductRepository {
         }
         if (filter.featuredOnly()) and.add(Criteria.where("isFeatured").is(true));
 
+        // Size and price filters only look at the SKUs counted in the summary, colors at ACTIVE variants in public.
         Set<UUID> productIds = null;
         if (notEmpty(filter.sizes())) {
             List<UUID> sizeIds = sizeColors.findSizeIdsByValues(filter.sizes());
             productIds = intersect(productIds, sizeIds.isEmpty() ? Set.of()
-                    : distinctProductIds(SkuDocument.COLLECTION, live().and("sizeId").in(sizeIds)));
+                    : productIdsWithSku(Criteria.where("sizeId").in(sizeIds), filter.publicOnly()));
         }
         if (notEmpty(filter.colors())) {
             List<UUID> colorIds = sizeColors.findColorIdsMatching(filter.colors());
             List<Criteria> anyColor = new ArrayList<>();
             if (!colorIds.isEmpty()) anyColor.add(Criteria.where("colorId").in(colorIds));
             filter.colors().forEach(color -> anyColor.add(Criteria.where("name").regex(containsIgnoreCase(color))));
+            Criteria variants = filter.publicOnly() ? live().and("status").is(ACTIVE) : live();
             productIds = intersect(productIds, distinctProductIds(VariantDocument.COLLECTION,
-                    live().andOperator(new Criteria().orOperator(anyColor))));
+                    variants.andOperator(new Criteria().orOperator(anyColor))));
         }
         if (filter.minPrice() != null) {
-            productIds = intersect(productIds, distinctProductIds(SkuDocument.COLLECTION,
-                    live().and("effectivePrice").gte(MongoValues.decimal(filter.minPrice()))));
+            productIds = intersect(productIds, productIdsWithSku(
+                    Criteria.where("effectivePrice").gte(MongoValues.decimal(filter.minPrice())), filter.publicOnly()));
         }
         if (filter.maxPrice() != null) {
-            productIds = intersect(productIds, distinctProductIds(SkuDocument.COLLECTION,
-                    live().and("effectivePrice").lte(MongoValues.decimal(filter.maxPrice()))));
+            productIds = intersect(productIds, productIdsWithSku(
+                    Criteria.where("effectivePrice").lte(MongoValues.decimal(filter.maxPrice())), filter.publicOnly()));
         }
         if (productIds != null) {
             if (productIds.isEmpty()) return null;

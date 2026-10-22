@@ -103,6 +103,6 @@ public class BlogPostRepository {
         Map<UUID, String> paths = files.findPathsByIds(docs.stream().map(BlogPostDocument::coverFileId).filter(Objects::nonNull).toList());
         return docs.stream().map(doc -> new BlogPost(doc.id(), doc.title(), doc.slug(), doc.excerpt(), "{}", doc.contentHtml(),
                 doc.coverFileId(), doc.coverFileId() == null ? null : paths.get(doc.coverFileId()), doc.status(),
-                odt(doc.publishedAt()), odt(doc.createdAt()))).toList();
+                odt(doc.publishedAt()), odt(doc.createdAt()), odt(doc.updatedAt()))).toList();
     }
 }

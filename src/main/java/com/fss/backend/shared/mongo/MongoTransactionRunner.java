@@ -4,6 +4,7 @@ import com.mongodb.MongoException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.fss.backend.common.ApiException;
+import com.fss.backend.common.ErrorCode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -42,7 +43,8 @@ public class MongoTransactionRunner {
                 }
                 if (attempt == maxAttempts) {
                     log.warn("MongoDB transaction still conflicting after {} attempts: {}", attempt, rootMessage(ex));
-                    throw new ApiException(HttpStatus.CONFLICT, "The request conflicted with concurrent updates, please retry");
+                    throw new ApiException(HttpStatus.CONFLICT, ErrorCode.CONCURRENT_UPDATE,
+                            "Có nhiều yêu cầu cập nhật cùng lúc, vui lòng thử lại.");
                 }
                 last = ex;
                 log.info("Retrying MongoDB transaction after transient error attempt={} cause={}", attempt, rootMessage(ex));

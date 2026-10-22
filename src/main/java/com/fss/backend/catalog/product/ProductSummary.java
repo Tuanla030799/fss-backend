@@ -9,4 +9,5 @@ public record ProductSummary(UUID id, UUID categoryId, String categoryName, UUID
                              String gender, String name, String slug,
                              String shortDescription, String status, Boolean isFeatured, Integer featuredOrder,
                              BigDecimal minPrice, BigDecimal minSalePrice, Integer totalStock,
-                             UUID primaryFileId, String primaryImageUrl, OffsetDateTime createdAt) {}
+                             UUID primaryFileId, String primaryImageUrl, OffsetDateTime createdAt,
+                             OffsetDateTime updatedAt) {}

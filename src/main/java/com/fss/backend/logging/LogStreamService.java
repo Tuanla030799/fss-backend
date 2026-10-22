@@ -1,6 +1,7 @@
 package com.fss.backend.logging;
 
 import com.fss.backend.common.ApiException;
+import com.fss.backend.common.ErrorCode;
 import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -45,7 +46,7 @@ public class LogStreamService {
     public SseEmitter streamCurrentLog(int requestedLines) {
         if (activeConnections.incrementAndGet() > maxConnections) {
             activeConnections.decrementAndGet();
-            throw new ApiException("Too many active log streams");
+            throw new ApiException(ErrorCode.LOG_STREAM_LIMIT_REACHED, "Too many active log streams");
         }
 
         SseEmitter emitter = new SseEmitter(EMITTER_TIMEOUT_MS);

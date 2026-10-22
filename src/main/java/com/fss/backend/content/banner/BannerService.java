@@ -1,5 +1,6 @@
 package com.fss.backend.content.banner;
 
+import com.fss.backend.common.ErrorCode;
 import com.fss.backend.common.PageResult;
 import com.fss.backend.file.FileReferenceService;
 import com.fss.backend.shared.ecommerce.EcommerceSupport;
@@ -49,7 +50,7 @@ public class BannerService {
     @Transactional
     public void updateBanner(UUID id, LandingBannerRequest request) {
         LandingBanner existing = repository.findBannerById(id);
-        support.require(existing != null, "Banner not found");
+        support.requireFound(existing != null, ErrorCode.BANNER_NOT_FOUND, "Banner not found");
         support.activateFile(request.fileId());
         repository.updateBanner(id, request.title(), request.subtitle(), request.linkUrl(), request.fileId(),
                 support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE), support.nz(request.sortOrder()),
@@ -60,7 +61,7 @@ public class BannerService {
     @Transactional
     public void deleteBanner(UUID id) {
         LandingBanner existing = repository.findBannerById(id);
-        support.require(existing != null, "Banner not found");
+        support.requireFound(existing != null, ErrorCode.BANNER_NOT_FOUND, "Banner not found");
         repository.softDeleteBanner(id, support.adminId());
         fileReferenceService.releaseFile(existing.fileId());
     }

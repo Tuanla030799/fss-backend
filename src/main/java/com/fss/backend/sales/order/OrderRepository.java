@@ -1,5 +1,7 @@
 package com.fss.backend.sales.order;
 
+import com.fss.backend.catalog.brand.BrandDocument;
+import com.fss.backend.catalog.category.CategoryDocument;
 import com.fss.backend.catalog.product.ProductDocument;
 import com.fss.backend.catalog.product.VariantDocument;
 import com.fss.backend.catalog.sku.SkuDocument;
@@ -33,17 +35,26 @@ public class OrderRepository {
         this.mongo = mongo;
     }
 
-    /** Live, ACTIVE SKU of a live, ACTIVE product, with names for the order snapshot (null if not orderable). */
+    /**
+     * The SKU with names for the order snapshot, or null unless the storefront sells it: the SKU, its variant (if
+     * any), product, category and brand (if any) must all be live and ACTIVE.
+     */
     public SkuForOrder findSkuForOrder(UUID id) {
-        SkuDocument sku = mongo.findOne(Query.query(live().and("_id").is(id).and("status").is("ACTIVE")), SkuDocument.class);
+        SkuDocument sku = findLiveActive(id, SkuDocument.class);
         if (sku == null) return null;
-        ProductDocument product = mongo.findOne(Query.query(live().and("_id").is(sku.productId()).and("status").is("ACTIVE")),
-                ProductDocument.class);
+        ProductDocument product = findLiveActive(sku.productId(), ProductDocument.class);
+        if (product == null || findLiveActive(product.categoryId(), CategoryDocument.class) == null) return null;
+        if (product.brandId() != null && findLiveActive(product.brandId(), BrandDocument.class) == null) return null;
+        VariantDocument variant = sku.variantId() == null ? null : findLiveActive(sku.variantId(), VariantDocument.class);
+        if (sku.variantId() != null && variant == null) return null;
         SizeDocument size = sku.sizeId() == null ? null : mongo.findById(sku.sizeId(), SizeDocument.class);
-        if (product == null || size == null) return null;
-        VariantDocument variant = sku.variantId() == null ? null : mongo.findById(sku.variantId(), VariantDocument.class);
+        if (size == null) return null;
         return new SkuForOrder(sku.id(), sku.productId(), sku.variantId(), sku.skuCode(), sku.sizeId(), size.value(),
                 sku.price(), sku.salePrice(), sku.stock(), sku.status(), product.name(), variant == null ? null : variant.name());
+    }
+
+    private <T> T findLiveActive(UUID id, Class<T> type) {
+        return id == null ? null : mongo.findOne(Query.query(live().and("_id").is(id).and("status").is("ACTIVE")), type);
     }
 
     /**
