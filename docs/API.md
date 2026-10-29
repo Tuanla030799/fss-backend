@@ -262,7 +262,8 @@ Các trang tĩnh do admin soạn. Danh sách khoá cố định:
 ```
 
 - `POST`/`PUT /admin/landing-banners` nhận thêm `mobileFileId` (tuỳ chọn): ảnh dọc riêng cho điện thoại
-  (khuyến nghị 1080×1350, 4:5). Bỏ trường này hoặc gửi `null` để xoá ảnh mobile.
+  (khuyến nghị 1080×1920, 9:16; FE đặt chữ đè lên khoảng 40% phía dưới ảnh). Bỏ trường này hoặc gửi
+  `null` để xoá ảnh mobile.
 - Không có ảnh mobile thì `mobileFileId` và `mobileImageUrl` là `null`; FE tự cắt ảnh desktop.
 - Ảnh mobile theo cùng vòng đời file với ảnh desktop: được kích hoạt khi lưu, giải phóng khi bị thay hoặc
   khi xoá banner.
