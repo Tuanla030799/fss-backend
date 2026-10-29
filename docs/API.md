@@ -252,3 +252,17 @@ Các trang tĩnh do admin soạn. Danh sách khoá cố định:
 - `question` bắt buộc (≤ 300 ký tự). `answerHtml` bắt buộc, kể cả sau khi làm sạch (chỉ có `<script>` cũng bị từ chối): 400 `VALIDATION_ERROR`.
 - `sortOrder` mặc định `0`. `status` mặc định `ACTIVE`.
 - Id không tồn tại hoặc đã xoá trả 404 `FAQ_NOT_FOUND`.
+
+## 12. Landing banner: ảnh desktop và ảnh mobile
+
+```json
+{ "id": "…", "title": "…", "subtitle": "…", "linkUrl": "…", "fileId": "…", "imageUrl": "https://…",
+  "mobileFileId": "…", "mobileImageUrl": "https://…", "status": "ACTIVE", "sortOrder": 0,
+  "startsAt": null, "endsAt": null, "createdAt": "…" }
+```
+
+- `POST`/`PUT /admin/landing-banners` nhận thêm `mobileFileId` (tuỳ chọn): ảnh dọc riêng cho điện thoại
+  (khuyến nghị 1080×1350, 4:5). Bỏ trường này hoặc gửi `null` để xoá ảnh mobile.
+- Không có ảnh mobile thì `mobileFileId` và `mobileImageUrl` là `null`; FE tự cắt ảnh desktop.
+- Ảnh mobile theo cùng vòng đời file với ảnh desktop: được kích hoạt khi lưu, giải phóng khi bị thay hoặc
+  khi xoá banner.

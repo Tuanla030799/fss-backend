@@ -12,7 +12,7 @@ import java.util.UUID;
  * Answers "is this file still used?" across every collection that can point at a file.
  *
  * <p>Direct references are stored as file ids ({@code images.fileId}, {@code imageFileId}, {@code fileId},
- * {@code fileSizeId}, {@code coverFileId}). Images inside rich-text HTML are tracked through the
+ * {@code fileSizeId}, {@code mobileFileId}, {@code coverFileId}). Images inside rich-text HTML are tracked through the
  * {@code htmlFilePaths} array that products, collections, blog posts, site pages and FAQs maintain on every save. All
  * of these fields are indexed (see {@code MongoIndexInitializer}).
  */
@@ -40,7 +40,7 @@ public class FileUsageIndex {
             if (exists(PRODUCTS, live().and("images.fileId").is(id))) return true;
             if (liveVariantReference(id)) return true;
             if (exists(BRANDS, live().orOperator(Criteria.where("fileId").is(id), Criteria.where("fileSizeId").is(id)))) return true;
-            if (exists(BANNERS, live().and("fileId").is(id))) return true;
+            if (exists(BANNERS, live().orOperator(Criteria.where("fileId").is(id), Criteria.where("mobileFileId").is(id)))) return true;
             if (exists(COLLECTIONS, live().and("fileId").is(id))) return true;
             if (exists(BLOG_POSTS, live().and("coverFileId").is(id))) return true;
         }
@@ -56,7 +56,7 @@ public class FileUsageIndex {
             if (exists(PRODUCTS, Criteria.where("images.fileId").is(id))) return true;
             if (exists(VARIANTS, Criteria.where("imageFileId").is(id))) return true;
             if (exists(BRANDS, new Criteria().orOperator(Criteria.where("fileId").is(id), Criteria.where("fileSizeId").is(id)))) return true;
-            if (exists(BANNERS, Criteria.where("fileId").is(id))) return true;
+            if (exists(BANNERS, new Criteria().orOperator(Criteria.where("fileId").is(id), Criteria.where("mobileFileId").is(id)))) return true;
             if (exists(COLLECTIONS, Criteria.where("fileId").is(id))) return true;
             if (exists(BLOG_POSTS, Criteria.where("coverFileId").is(id))) return true;
         }

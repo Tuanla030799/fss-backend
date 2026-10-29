@@ -7,6 +7,7 @@ import com.fss.backend.shared.ecommerce.EcommerceSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -41,9 +42,10 @@ public class BannerService {
     public UUID createBanner(LandingBannerRequest request) {
         UUID id = UUID.randomUUID();
         support.activateFile(request.fileId());
+        support.activateFile(request.mobileFileId());
         repository.insertBanner(id, request.title(), request.subtitle(), request.linkUrl(), request.fileId(),
-                support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE), support.nz(request.sortOrder()),
-                request.startsAt(), request.endsAt(), support.adminId());
+                request.mobileFileId(), support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
+                support.nz(request.sortOrder()), request.startsAt(), request.endsAt(), support.adminId());
         return id;
     }
 
@@ -52,10 +54,11 @@ public class BannerService {
         LandingBanner existing = repository.findBannerById(id);
         support.requireFound(existing != null, ErrorCode.BANNER_NOT_FOUND, "Banner not found");
         support.activateFile(request.fileId());
+        support.activateFile(request.mobileFileId());
         repository.updateBanner(id, request.title(), request.subtitle(), request.linkUrl(), request.fileId(),
-                support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE), support.nz(request.sortOrder()),
-                request.startsAt(), request.endsAt(), support.adminId());
-        fileReferenceService.releaseFile(existing.fileId());
+                request.mobileFileId(), support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
+                support.nz(request.sortOrder()), request.startsAt(), request.endsAt(), support.adminId());
+        fileReferenceService.releaseFiles(Arrays.asList(existing.fileId(), existing.mobileFileId()));
     }
 
     @Transactional
@@ -63,12 +66,17 @@ public class BannerService {
         LandingBanner existing = repository.findBannerById(id);
         support.requireFound(existing != null, ErrorCode.BANNER_NOT_FOUND, "Banner not found");
         repository.softDeleteBanner(id, support.adminId());
-        fileReferenceService.releaseFile(existing.fileId());
+        fileReferenceService.releaseFiles(Arrays.asList(existing.fileId(), existing.mobileFileId()));
     }
 
     private LandingBanner withBannerUrl(LandingBanner banner) {
-        return banner == null || banner.imageUrl() == null ? banner : new LandingBanner(banner.id(), banner.title(),
-                banner.subtitle(), banner.linkUrl(), banner.fileId(), support.publicUrl(banner.imageUrl()), banner.status(),
-                banner.sortOrder(), banner.startsAt(), banner.endsAt(), banner.createdAt());
+        return banner == null ? null : new LandingBanner(banner.id(), banner.title(), banner.subtitle(), banner.linkUrl(),
+                banner.fileId(), publicUrlOrNull(banner.imageUrl()), banner.mobileFileId(),
+                publicUrlOrNull(banner.mobileImageUrl()), banner.status(), banner.sortOrder(), banner.startsAt(),
+                banner.endsAt(), banner.createdAt());
+    }
+
+    private String publicUrlOrNull(String path) {
+        return path == null ? null : support.publicUrl(path);
     }
 }

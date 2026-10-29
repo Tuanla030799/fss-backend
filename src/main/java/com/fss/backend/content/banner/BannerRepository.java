@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static com.fss.backend.shared.mongo.MongoValues.hasText;
 import static com.fss.backend.shared.mongo.MongoValues.instant;
@@ -46,17 +47,20 @@ public class BannerRepository {
         return doc == null ? null : toBanners(List.of(doc)).get(0);
     }
 
-    public void insertBanner(UUID id, String title, String subtitle, String linkUrl, UUID fileId, String status,
-                             Integer sortOrder, OffsetDateTime startsAt, OffsetDateTime endsAt, UUID adminId) {
+    public void insertBanner(UUID id, String title, String subtitle, String linkUrl, UUID fileId, UUID mobileFileId,
+                             String status, Integer sortOrder, OffsetDateTime startsAt, OffsetDateTime endsAt,
+                             UUID adminId) {
         Instant now = Instant.now();
-        mongo.insert(new BannerDocument(id, title, subtitle, linkUrl, fileId, status, sortOrder, instant(startsAt),
-                instant(endsAt), adminId, adminId, now, now, false, null));
+        mongo.insert(new BannerDocument(id, title, subtitle, linkUrl, fileId, mobileFileId, status, sortOrder,
+                instant(startsAt), instant(endsAt), adminId, adminId, now, now, false, null));
     }
 
-    public void updateBanner(UUID id, String title, String subtitle, String linkUrl, UUID fileId, String status,
-                             Integer sortOrder, OffsetDateTime startsAt, OffsetDateTime endsAt, UUID adminId) {
+    public void updateBanner(UUID id, String title, String subtitle, String linkUrl, UUID fileId, UUID mobileFileId,
+                             String status, Integer sortOrder, OffsetDateTime startsAt, OffsetDateTime endsAt,
+                             UUID adminId) {
         mongo.updateFirst(Query.query(live().and("_id").is(id)), new Update().set("title", title).set("subtitle", subtitle)
-                .set("linkUrl", linkUrl).set("fileId", fileId).set("status", status).set("sortOrder", sortOrder)
+                .set("linkUrl", linkUrl).set("fileId", fileId).set("mobileFileId", mobileFileId)
+                .set("status", status).set("sortOrder", sortOrder)
                 .set("startsAt", instant(startsAt)).set("endsAt", instant(endsAt)).set("updatedBy", adminId)
                 .set("updatedAt", Instant.now()), BannerDocument.class);
     }
@@ -84,9 +88,11 @@ public class BannerRepository {
     }
 
     private List<LandingBanner> toBanners(List<BannerDocument> docs) {
-        Map<UUID, String> paths = files.findPathsByIds(docs.stream().map(BannerDocument::fileId).filter(Objects::nonNull).toList());
+        Map<UUID, String> paths = files.findPathsByIds(docs.stream()
+                .flatMap(doc -> Stream.of(doc.fileId(), doc.mobileFileId())).filter(Objects::nonNull).toList());
         return docs.stream().map(doc -> new LandingBanner(doc.id(), doc.title(), doc.subtitle(), doc.linkUrl(), doc.fileId(),
-                doc.fileId() == null ? null : paths.get(doc.fileId()), doc.status(), doc.sortOrder(), odt(doc.startsAt()),
-                odt(doc.endsAt()), odt(doc.createdAt()))).toList();
+                doc.fileId() == null ? null : paths.get(doc.fileId()), doc.mobileFileId(),
+                doc.mobileFileId() == null ? null : paths.get(doc.mobileFileId()), doc.status(), doc.sortOrder(),
+                odt(doc.startsAt()), odt(doc.endsAt()), odt(doc.createdAt()))).toList();
     }
 }
