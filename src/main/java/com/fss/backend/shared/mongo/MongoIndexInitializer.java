@@ -97,6 +97,9 @@ public class MongoIndexInitializer implements ApplicationRunner {
         index("blog_posts", new Index().on("deleted", Sort.Direction.ASC).on("status", Sort.Direction.ASC).on("publishedAt", Sort.Direction.DESC));
         index("blog_posts", new Index().on("coverFileId", Sort.Direction.ASC));
         index("blog_posts", new Index().on("htmlFilePaths", Sort.Direction.ASC));
+        index("site_pages", new Index().on("htmlFilePaths", Sort.Direction.ASC));
+        index("faqs", new Index().on("deleted", Sort.Direction.ASC).on("status", Sort.Direction.ASC).on("sortOrder", Sort.Direction.ASC));
+        index("faqs", new Index().on("htmlFilePaths", Sort.Direction.ASC));
 
         // promotion + sales
         uniqueLive("coupons", "code");

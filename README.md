@@ -14,7 +14,8 @@ Hướng dẫn triển khai đầy đủ (MongoDB Atlas, Cloudflare R2, Heroku, 
 - `file`: upload ảnh, xử lý ảnh, metadata file, lưu trữ local/R2, dọn file không dùng.
 - `catalog/category|brand|product|sku`, `masterdata` (size/màu).
 - `sales/order`, `promotion/coupon`, `customer`.
-- `content/banner|blog|collection|html` (HTML TinyMCE đã sanitize, theo dõi ảnh trong HTML).
+- `content/banner|blog|collection|page|faq|html` (HTML TinyMCE đã sanitize, theo dõi ảnh trong HTML). `page`: trang nội dung
+  admin soạn (giới thiệu, cách mua hàng và vận chuyển), `faq`: câu hỏi thường gặp.
 - `shared/mongo`: cấu hình MongoDB, index, seed master data, transaction runner.
 - `migration-tool/` (Gradle subproject, **không** nằm trong jar deploy): chuyển PostgreSQL cũ → MongoDB và `uploads/` → R2.
 
@@ -79,10 +80,11 @@ Không đổi so với bản PostgreSQL (cùng path, request, response, định 
 - `POST /api/admin/auth/register|login|refresh|logout`
 - `POST /api/files/upload`, `POST /api/admin/files/upload` → `{fileId, path, url, resized, width, height}`
 - `GET /files/{yyyy-MM-dd}/{file-name}` (local: trả file; R2: chuyển hướng 301 sang URL R2)
-- `GET /api/categories|brands|products|products/featured|products/{slug}|collections|blogs|landing-banners|master-data`
+- `GET /api/categories|brands|products|products/featured|products/{slug}|collections|blogs|landing-banners|master-data|pages/{key}|faqs`
 - `POST /api/orders`, `POST /api/coupons/validate`
 - `GET|POST|PUT|PATCH|DELETE /api/admin/...` cho categories, brands, products (+variants, skus), sizes, colors,
-  orders (+status, payment, shipping, status-history), landing-banners, coupons, collections, blogs, users, customers.
+  orders (+status, payment, shipping, status-history), landing-banners, coupons, collections, blogs, pages, faqs, users,
+  customers.
 
 ## Triển khai cũ (Google Cloud VM)
 `docker-compose.prod.yml`, `scripts/*.sh`, `.github/workflows/deploy-dev.yml` và `docs/deploy-google-cloud-vm.md`

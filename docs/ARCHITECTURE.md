@@ -21,6 +21,8 @@ Mục tiêu: giữ codebase dễ mở rộng khi thêm module/domain mới, như
 - `sales/order`: order record, payment/shipping status, status history, controller, service, mapper.
 - `promotion/coupon`: coupon record, validate request/response, controller, service, mapper.
 - `content/banner`: landing banner record, request, controller, service, mapper.
+- `content/page`: admin-edited site pages with fixed keys (`SitePageKey`: about, purchase-shipping).
+- `content/faq`: FAQ record, request, controller, service, repository.
 - `customer`: customer user record, request, controller, service, mapper.
 - `shared`: request/helper dùng chung như `UpdateStatusRequest`, `EcommerceSupport`.
 

@@ -35,7 +35,7 @@ Lỗi:
 | 400 | Request sai: validate (`VALIDATION_ERROR`), JSON hỏng (`INVALID_REQUEST_BODY`), id tham chiếu trong body không tồn tại (vd. `CATEGORY_NOT_FOUND` khi tạo sản phẩm), quy tắc nghiệp vụ (`OUT_OF_STOCK`, `COUPON_EXPIRED`...), sai mật khẩu hoặc refresh token (`AUTH_INVALID_CREDENTIALS`, `AUTH_REFRESH_TOKEN_INVALID`). |
 | 401 | Chỉ với API admin: thiếu token (`AUTH_REQUIRED`), token sai hoặc hết hạn (`AUTH_TOKEN_INVALID`). FE gọi refresh khi gặp 401. |
 | 403 | `ACCESS_DENIED` |
-| 404 | Tài nguyên ở **path** không tồn tại hoặc đã xoá: `/products/{slug}`, `/blogs/{slug}`, `/collections/{slug}`, `/admin/.../{id}`. Dùng để hiển thị trang 404. |
+| 404 | Tài nguyên ở **path** không tồn tại hoặc đã xoá: `/products/{slug}`, `/blogs/{slug}`, `/collections/{slug}`, `/pages/{key}`, `/admin/.../{id}`. Dùng để hiển thị trang 404. |
 | 409 | Trùng giá trị duy nhất (`SLUG_ALREADY_EXISTS`, `SKU_CODE_ALREADY_EXISTS`, `EMAIL_ALREADY_EXISTS`, `PHONE_ALREADY_EXISTS`...) hoặc ghi đồng thời (`CONCURRENT_UPDATE`, có thể thử lại). |
 | 413 / 415 / 429 / 503 | `FILE_TOO_LARGE`/`PAYLOAD_TOO_LARGE`, `FILE_TYPE_NOT_SUPPORTED`/`UNSUPPORTED_MEDIA_TYPE`, `LOG_STREAM_LIMIT_REACHED`, `STORAGE_UNAVAILABLE`/`SERVER_BUSY`. |
 | 500 | `INTERNAL_ERROR` |
@@ -49,7 +49,7 @@ Nguồn: `src/main/java/com/fss/backend/common/ErrorCode.java`.
 | Chung | `BAD_REQUEST`, `VALIDATION_ERROR`, `INVALID_REQUEST_BODY`, `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `NOT_ACCEPTABLE`, `UNSUPPORTED_MEDIA_TYPE`, `CONFLICT`, `CONCURRENT_UPDATE`, `DUPLICATE_VALUE`, `PAYLOAD_TOO_LARGE`, `TOO_MANY_REQUESTS`, `ACCESS_DENIED`, `SERVICE_UNAVAILABLE`, `INTERNAL_ERROR` |
 | Xác thực | `AUTH_REQUIRED`, `AUTH_TOKEN_INVALID`, `AUTH_INVALID_CREDENTIALS`, `AUTH_REFRESH_TOKEN_INVALID`, `AUTH_REGISTRATION_DISABLED`, `ADMIN_USER_NOT_FOUND`, `EMAIL_ALREADY_EXISTS` |
 | Catalog | `PRODUCT_NOT_FOUND`, `VARIANT_NOT_FOUND`, `SKU_NOT_FOUND`, `CATEGORY_NOT_FOUND`, `BRAND_NOT_FOUND`, `SIZE_NOT_FOUND`, `SIZE_INACTIVE`, `DEFAULT_SIZE_NOT_CONFIGURED`, `COLOR_NOT_FOUND`, `COLOR_INACTIVE`, `SLUG_ALREADY_EXISTS`, `SKU_CODE_ALREADY_EXISTS`, `SIZE_ALREADY_EXISTS`, `COLOR_ALREADY_EXISTS` |
-| Nội dung | `BLOG_POST_NOT_FOUND`, `COLLECTION_NOT_FOUND`, `BANNER_NOT_FOUND` |
+| Nội dung | `BLOG_POST_NOT_FOUND`, `COLLECTION_NOT_FOUND`, `BANNER_NOT_FOUND`, `SITE_PAGE_NOT_FOUND`, `FAQ_NOT_FOUND` |
 | File | `FILE_NOT_FOUND`, `FILE_UNAVAILABLE`, `FILE_EMPTY`, `FILE_TYPE_NOT_SUPPORTED`, `FILE_TOO_LARGE`, `IMAGE_TOO_LARGE`, `IMAGE_CORRUPTED`, `STORAGE_UNAVAILABLE`, `SERVER_BUSY` |
 | Khách hàng, đơn hàng | `CUSTOMER_NOT_FOUND`, `PHONE_ALREADY_EXISTS`, `ORDER_NOT_FOUND`, `SKU_UNAVAILABLE`, `OUT_OF_STOCK` |
 | Mã giảm giá | `COUPON_NOT_FOUND`, `COUPON_INVALID`, `COUPON_NOT_STARTED`, `COUPON_EXPIRED`, `COUPON_USAGE_LIMIT_REACHED`, `COUPON_MIN_SUBTOTAL`, `COUPON_CODE_ALREADY_EXISTS` |
@@ -120,6 +120,7 @@ Nội dung khác:
 - Blog: `ACTIVE` và `publishedAt` ≤ hiện tại. Bài hẹn giờ và bài nháp trả 404 theo slug.
 - Banner: `ACTIVE`, đang trong khoảng `startsAt`–`endsAt`.
 - Bộ sưu tập: `ACTIVE`.
+- FAQ: `ACTIVE`.
 
 ## 6. Mã giảm giá: `POST /coupons/validate`
 
@@ -200,8 +201,54 @@ Lỗi:
 
 ## 9. HTML rich text
 
-Server làm sạch `descriptionHtml` (sản phẩm), `contentHtml` (blog) và nội dung bộ sưu tập theo whitelist trước khi lưu:
+Server làm sạch `descriptionHtml` (sản phẩm), `contentHtml` (blog, trang nội dung), `answerHtml` (FAQ) và nội dung bộ
+sưu tập theo whitelist trước khi lưu:
 - Bỏ script, `on*`, `javascript:`.
 - Chỉ giữ ảnh từ storage của hệ thống.
 
 FE vẫn nên sanitize khi render dữ liệu cũ.
+
+## 10. Trang nội dung: `/pages/{key}`
+
+Các trang tĩnh do admin soạn. Danh sách khoá cố định:
+
+| `key` | Trang | Tiêu đề mặc định |
+|---|---|---|
+| `about` | Giới thiệu | `Về chúng tôi` |
+| `purchase-shipping` | Tab "Cách mua hàng và hình thức vận chuyển" ở trang sản phẩm | `Cách mua hàng và hình thức vận chuyển` |
+
+```json
+{ "key": "about", "title": "Về chúng tôi", "summary": "…", "contentHtml": "<p>…</p>",
+  "createdAt": "2026-10-29T03:00:00Z", "updatedAt": "2026-10-29T03:00:00Z" }
+```
+
+| Endpoint | Ghi chú |
+|---|---|
+| `GET /pages/{key}` | Public. Trang chưa từng lưu vẫn trả 200 với tiêu đề mặc định, `summary`, `contentHtml`, `createdAt`, `updatedAt` là `null`. |
+| `GET /admin/pages` | Danh sách phân trang gồm tất cả khoá theo thứ tự trên (`page` 1, `limit` = `total` = số khoá). |
+| `GET /admin/pages/{key}` | Như bản public. |
+| `PUT /admin/pages/{key}` | Body `{ title, summary, contentHtml }`, tạo mới hoặc ghi đè. `title` bắt buộc (≤ 200 ký tự), `summary` ≤ 500 ký tự, rỗng thì lưu `null`. |
+
+- Khoá không thuộc danh sách trả 404 `SITE_PAGE_NOT_FOUND`.
+- Không có API xoá trang.
+
+## 11. FAQ: `/faqs`
+
+```json
+{ "id": "…", "question": "Bao lâu thì nhận được hàng?", "answerHtml": "<p>…</p>", "sortOrder": 0,
+  "status": "ACTIVE", "createdAt": "…", "updatedAt": "…" }
+```
+
+| Endpoint | Ghi chú |
+|---|---|
+| `GET /faqs?page=&limit=` | Public, chỉ FAQ `ACTIVE`. |
+| `GET /admin/faqs?status=&keyword=&page=&limit=` | `status` là `ACTIVE`/`INACTIVE`. `keyword` tìm trong câu hỏi, không phân biệt hoa thường. |
+| `GET /admin/faqs/{id}` | |
+| `POST /admin/faqs` | Body `{ question, answerHtml, sortOrder, status }`. Trả `{ "id": "…" }`. |
+| `PUT /admin/faqs/{id}` | Cùng body với `POST`. |
+| `DELETE /admin/faqs/{id}` | Xoá mềm. |
+
+- Danh sách sắp xếp theo `sortOrder` tăng dần, rồi `createdAt` tăng dần.
+- `question` bắt buộc (≤ 300 ký tự). `answerHtml` bắt buộc, kể cả sau khi làm sạch (chỉ có `<script>` cũng bị từ chối): 400 `VALIDATION_ERROR`.
+- `sortOrder` mặc định `0`. `status` mặc định `ACTIVE`.
+- Id không tồn tại hoặc đã xoá trả 404 `FAQ_NOT_FOUND`.

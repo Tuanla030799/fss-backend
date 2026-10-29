@@ -13,8 +13,8 @@ import java.util.UUID;
  *
  * <p>Direct references are stored as file ids ({@code images.fileId}, {@code imageFileId}, {@code fileId},
  * {@code fileSizeId}, {@code coverFileId}). Images inside rich-text HTML are tracked through the
- * {@code htmlFilePaths} array that products, collections and blog posts maintain on every save. All of these fields
- * are indexed (see {@code MongoIndexInitializer}).
+ * {@code htmlFilePaths} array that products, collections, blog posts, site pages and FAQs maintain on every save. All
+ * of these fields are indexed (see {@code MongoIndexInitializer}).
  */
 @Component
 public class FileUsageIndex {
@@ -24,7 +24,9 @@ public class FileUsageIndex {
     static final String BANNERS = "landing_banners";
     static final String COLLECTIONS = "collections";
     static final String BLOG_POSTS = "blog_posts";
-    static final List<String> HTML_COLLECTIONS = List.of(PRODUCTS, COLLECTIONS, BLOG_POSTS);
+    static final String SITE_PAGES = "site_pages";
+    static final String FAQS = "faqs";
+    static final List<String> HTML_COLLECTIONS = List.of(PRODUCTS, COLLECTIONS, BLOG_POSTS, SITE_PAGES, FAQS);
 
     private final MongoTemplate mongo;
 

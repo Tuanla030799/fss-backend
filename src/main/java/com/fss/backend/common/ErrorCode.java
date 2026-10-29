@@ -53,6 +53,8 @@ public enum ErrorCode {
     BLOG_POST_NOT_FOUND,
     COLLECTION_NOT_FOUND,
     BANNER_NOT_FOUND,
+    SITE_PAGE_NOT_FOUND,
+    FAQ_NOT_FOUND,
 
     // Files
     FILE_NOT_FOUND,
