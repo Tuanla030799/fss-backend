@@ -182,6 +182,46 @@ class CatalogApiIntegrationTest extends MongoIntegrationTest {
     }
 
     @Test
+    void perSizePricesDiscountFilterAndSort() throws Exception {
+        JsonNode master = body(mvc.perform(admin(get("/api/admin/master-data"))).andExpect(status().isOk()).andReturn()).get("data");
+        String size40 = idOf(master.get("sizes"), "value", "40");
+        String size41 = idOf(master.get("sizes"), "value", "41");
+        String categoryId = createId("/api/admin/categories", Map.of("name", unique("Sale")));
+        String tag = unique("Sale");
+
+        // Size 40 at 1,000,000 without sale, size 41 at 1,200,000 on sale for 840,000 (30%): the discount is per SKU, not
+        // derived from minPrice/minSalePrice (which would give 16%).
+        String perSize = createId("/api/admin/products", Map.of("categoryId", categoryId, "name", tag + " per size",
+                "status", "ACTIVE", "skus", List.of(
+                        Map.of("skuCode", unique("SKU"), "sizeId", size40, "price", 1000000, "stock", 1),
+                        Map.of("skuCode", unique("SKU"), "sizeId", size41, "price", 1200000, "salePrice", 840000, "stock", 1))));
+        String exactly20 = createId("/api/admin/products", Map.of("categoryId", categoryId, "name", tag + " twenty",
+                "status", "ACTIVE", "skus", List.of(
+                        Map.of("skuCode", unique("SKU"), "price", 1000000, "salePrice", 800000, "stock", 1))));
+        createId("/api/admin/products", Map.of("categoryId", categoryId, "name", tag + " small", "status", "ACTIVE",
+                "skus", List.of(Map.of("skuCode", unique("SKU"), "price", 1000000, "salePrice", 900000, "stock", 1))));
+        String noSale = createId("/api/admin/products", Map.of("categoryId", categoryId, "name", tag + " none",
+                "status", "ACTIVE", "skus", List.of(Map.of("skuCode", unique("SKU"), "price", 1000000, "stock", 1))));
+
+        JsonNode sale = getData("/api/products?keyword=" + tag + "&minDiscount=20&sort=discount-desc");
+        assertEquals(2, sale.get("total").asLong());
+        assertEquals(perSize, sale.get("items").get(0).get("id").asText());
+        assertEquals(30, sale.get("items").get(0).get("maxDiscountPercent").asInt());
+        assertEquals(exactly20, sale.get("items").get(1).get("id").asText());
+        assertEquals(20, sale.get("items").get(1).get("maxDiscountPercent").asInt());
+
+        JsonNode all = getData("/api/products?keyword=" + tag + "&sort=discount_desc");
+        assertEquals(4, all.get("total").asLong());
+        assertEquals(noSale, all.get("items").get(3).get("id").asText(), "products without discount come last");
+        assertEquals(0, all.get("items").get(3).get("maxDiscountPercent").asInt());
+
+        JsonNode detail = getData("/api/products/" + getData("/api/admin/products/" + perSize).get("slug").asText());
+        assertEquals(2, detail.get("skus").size());
+
+        mvc.perform(get("/api/products?minDiscount=0")).andExpect(status().isBadRequest());
+    }
+
+    @Test
     void masterDataUniquenessIsCaseInsensitiveAndSoftDeleteFreesTheKey() throws Exception {
         String value = unique("XL");
         createId("/api/admin/sizes", Map.of("value", value));

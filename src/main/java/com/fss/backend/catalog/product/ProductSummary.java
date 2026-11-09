@@ -4,10 +4,14 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * {@code maxDiscountPercent} is the largest discount (whole percent, rounded down) among the counted SKUs, 0 when none is
+ * on sale. With per-size prices it can differ from what {@code minPrice}/{@code minSalePrice} suggest.
+ */
 public record ProductSummary(UUID id, UUID categoryId, String categoryName, UUID brandId, String brandName, String brandSlug,
                              String brandSizeGuideUrl,
                              String gender, String name, String slug,
                              String shortDescription, String status, Boolean isFeatured, Integer featuredOrder,
-                             BigDecimal minPrice, BigDecimal minSalePrice, Integer totalStock,
+                             BigDecimal minPrice, BigDecimal minSalePrice, Integer maxDiscountPercent, Integer totalStock,
                              UUID primaryFileId, String primaryImageUrl, OffsetDateTime createdAt,
                              OffsetDateTime updatedAt) {}

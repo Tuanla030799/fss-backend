@@ -58,7 +58,7 @@ public class ProductService {
 
     public PageResult<ProductSummary> listPublicProducts(List<UUID> categoryIds, String categorySlug, List<UUID> brandIds, String brandSlug, List<String> genders, String keyword, List<String> sizes,
                                                          List<String> colors, BigDecimal minPrice, BigDecimal maxPrice,
-                                                         String sort, int page, int limit) {
+                                                         Integer minDiscount, String sort, int page, int limit) {
         ProductSort productSort = ProductSort.parse(sort);
         List<UUID> normalizedCategoryIds = normalizeUuidFilters(categoryIds);
         List<UUID> normalizedBrandIds = normalizeUuidFilters(brandIds);
@@ -68,7 +68,7 @@ public class ProductService {
         List<String> normalizedColors = normalizeTextFilters(colors);
         int safeLimit = support.safeLimit(limit);
         ProductFilter filter = new ProductFilter(true, null, normalizedCategoryIds, categorySlug, normalizedBrandIds, brandSlug,
-                normalizedGenders, normalizedKeyword, normalizedSizes, normalizedColors, minPrice, maxPrice, false);
+                normalizedGenders, normalizedKeyword, normalizedSizes, normalizedColors, minPrice, maxPrice, minDiscount, false);
         List<ProductSummary> items = repository.listProducts(filter, productSort, safeLimit, support.offset(page, safeLimit))
                 .stream().map(this::withProductUrl).toList();
         long total = repository.countProducts(filter);
@@ -85,7 +85,7 @@ public class ProductService {
         List<String> normalizedColors = normalizeTextFilters(color == null ? null : List.of(color));
         int safeLimit = support.safeLimit(limit);
         ProductFilter filter = new ProductFilter(false, normalizedStatus, normalizedCategoryIds, null, normalizedBrandIds, null,
-                normalizedGenders, normalizedKeyword, normalizedSizes, normalizedColors, null, null, false);
+                normalizedGenders, normalizedKeyword, normalizedSizes, normalizedColors, null, null, null, false);
         List<ProductSummary> items = repository.listProducts(filter, ProductSort.NEWEST, safeLimit, support.offset(page, safeLimit))
                 .stream().map(this::withProductUrl).toList();
         long total = repository.countProducts(filter);
@@ -394,7 +394,8 @@ public class ProductService {
         return product == null ? null : new ProductSummary(product.id(), product.categoryId(),
                 product.categoryName(), product.brandId(), product.brandName(), product.brandSlug(), support.publicUrl(product.brandSizeGuideUrl()),
                 product.gender(), product.name(), product.slug(), product.shortDescription(), product.status(),
-                product.isFeatured(), product.featuredOrder(), product.minPrice(), product.minSalePrice(), product.totalStock(),
+                product.isFeatured(), product.featuredOrder(), product.minPrice(), product.minSalePrice(), product.maxDiscountPercent(),
+                product.totalStock(),
                 product.primaryFileId(), support.publicUrl(product.primaryImageUrl()), product.createdAt(), product.updatedAt());
     }
 

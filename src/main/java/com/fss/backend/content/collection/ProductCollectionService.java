@@ -150,7 +150,8 @@ public class ProductCollectionService {
     private ProductSummary withProductUrl(ProductSummary product) {
         return product == null ? null : new ProductSummary(product.id(), product.categoryId(),
                 product.categoryName(), product.brandId(), product.brandName(), product.brandSlug(), support.publicUrl(product.brandSizeGuideUrl()), product.gender(), product.name(), product.slug(), product.shortDescription(), product.status(),
-                product.isFeatured(), product.featuredOrder(), product.minPrice(), product.minSalePrice(), product.totalStock(),
+                product.isFeatured(), product.featuredOrder(), product.minPrice(), product.minSalePrice(), product.maxDiscountPercent(),
+                product.totalStock(),
                 product.primaryFileId(), support.publicUrl(product.primaryImageUrl()), product.createdAt(), product.updatedAt());
     }
 }

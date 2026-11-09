@@ -34,10 +34,11 @@ public class ProductController {
                                                                   @RequestParam(required = false) List<String> color,
                                                                   @RequestParam(required = false) BigDecimal minPrice,
                                                                   @RequestParam(required = false) BigDecimal maxPrice,
+                                                                  @RequestParam(required = false) @Min(1) @Max(100) Integer minDiscount,
                                                                   @RequestParam(required = false) String sort,
                                                                   @RequestParam(defaultValue = "1") @Min(1) int page,
                                                                   @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
-        return ApiResponse.ok("OK", service.listPublicProducts(categoryIds, categorySlug, brandIds, brandSlug, gender, keyword, size, color, minPrice, maxPrice, sort, page, limit));
+        return ApiResponse.ok("OK", service.listPublicProducts(categoryIds, categorySlug, brandIds, brandSlug, gender, keyword, size, color, minPrice, maxPrice, minDiscount, sort, page, limit));
     }
 
     @GetMapping("/products/featured")

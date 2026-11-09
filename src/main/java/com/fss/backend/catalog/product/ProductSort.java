@@ -21,7 +21,9 @@ public enum ProductSort {
     /** Most expensive first; products without a sellable SKU come last. */
     PRICE_DESC,
     /** Name A to Z using Vietnamese collation. */
-    NAME_ASC;
+    NAME_ASC,
+    /** Largest discount first (see {@link ProductSummary#maxDiscountPercent()}); products not on sale come last. */
+    DISCOUNT_DESC;
 
     private static final String ALLOWED = Arrays.stream(values()).map(sort -> sort.name().toLowerCase(Locale.ROOT))
             .collect(Collectors.joining(", "));

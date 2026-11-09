@@ -24,6 +24,7 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -84,6 +85,7 @@ public class ProductRepository {
             case NAME_ASC -> mongo.find(Query.query(criteria).with(Sort.by(Sort.Order.asc("name")).and(NEWEST_FIRST))
                     .collation(VIETNAMESE).skip(offset).limit(limit), ProductDocument.class);
             case FEATURED -> aggregatePage(criteria, featuredFirst(), limit, offset);
+            case DISCOUNT_DESC -> aggregatePage(criteria, byDiscount(filter.publicOnly()), limit, offset);
             case PRICE_ASC, PRICE_DESC ->
                     aggregatePage(criteria, byLowestPrice(sort == ProductSort.PRICE_ASC, filter.publicOnly()), limit, offset);
         };
@@ -333,6 +335,7 @@ public class ProductRepository {
                     product.isFeatured(), product.featuredOrder(),
                     stats == null ? null : MongoValues.bigDecimal(stats.get("minPrice")),
                     stats == null ? null : MongoValues.bigDecimal(stats.get("minSalePrice")),
+                    stats == null ? 0 : discountPercent(stats.get("maxDiscount")),
                     stats == null ? 0 : ((Number) stats.getOrDefault("totalStock", 0)).intValue(),
                     primaryFileId, primaryPath, MongoValues.odt(product.createdAt()), lastUpdated(product, stats)));
         }
@@ -353,13 +356,48 @@ public class ProductRepository {
     }
 
     private Map<UUID, Document> skuStats(Collection<UUID> productIds, boolean publicOnly) {
-        GroupOperation group = Aggregation.group("productId").min("price").as("minPrice")
-                .min("effectivePrice").as("minSalePrice").sum("stock").as("totalStock").max("updatedAt").as("updatedAt");
+        // Spring's GroupOperation only takes field names, so the discount is added as a field before grouping.
+        Document group = new Document("$group", new Document("_id", "$productId")
+                .append("minPrice", new Document("$min", "$price"))
+                .append("minSalePrice", new Document("$min", "$effectivePrice"))
+                .append("maxDiscount", new Document("$max", "$_discount"))
+                .append("totalStock", new Document("$sum", "$stock"))
+                .append("updatedAt", new Document("$max", "$updatedAt")));
+        List<Document> stages = new ArrayList<>(skuStages(publicOnly));
+        stages.add(new Document("$addFields", new Document("_discount", SKU_DISCOUNT)));
+        stages.add(group);
         Map<UUID, Document> stats = new HashMap<>();
-        for (Document row : aggregateSkus(Criteria.where("productId").in(productIds), publicOnly, group)) {
+        for (Document row : aggregateRaw(Criteria.where("productId").in(productIds), stages)) {
             stats.put((UUID) row.get("_id"), row);
         }
         return stats;
+    }
+
+    /** Products with a counted SKU (see {@link #skuStages}) discounted by at least {@code minPercent} percent. */
+    private Set<UUID> productIdsWithDiscount(int minPercent, boolean publicOnly) {
+        List<Document> stages = new ArrayList<>(skuStages(publicOnly));
+        stages.add(new Document("$match", new Document("$expr", new Document("$gte", List.of(SKU_DISCOUNT, minPercent)))));
+        stages.add(new Document("$group", new Document("_id", "$productId")));
+        Set<UUID> ids = new LinkedHashSet<>();
+        aggregateRaw(new Criteria(), stages).forEach(row -> ids.add((UUID) row.get("_id")));
+        return ids;
+    }
+
+    /** {@code match} goes through Spring's mapping (UUID encoding), then the raw stages run over {@code skus}. */
+    private List<Document> aggregateRaw(Criteria match, List<Document> stages) {
+        List<AggregationOperation> operations = new ArrayList<>();
+        operations.add(Aggregation.match(match));
+        stages.forEach(stage -> operations.add(context -> stage));
+        return mongo.aggregate(Aggregation.newAggregation(operations), SkuDocument.COLLECTION, Document.class)
+                .getMappedResults();
+    }
+
+    /** Whole percent, rounded down so a product listed under "20% or more" never shows 19%. */
+    private static int discountPercent(Object value) {
+        BigDecimal discount = MongoValues.bigDecimal(value);
+        // Round first so a division artefact such as 19.99999... is not cut down to 19.
+        return discount == null ? 0
+                : Math.max(0, discount.setScale(6, RoundingMode.HALF_UP).setScale(0, RoundingMode.FLOOR).intValue());
     }
 
     /** Products having a SKU that matches {@code criteria} and counts (see {@link #skuStages}). */
@@ -393,6 +431,33 @@ public class ProductRepository {
     }
 
     // ---------------------------------------------------------------- sorting
+
+    /**
+     * Percent off of one SKU: (price - salePrice) / price * 100, or 0 when it has no valid sale price. Same rule as the
+     * storefront: a sale price only counts when it is lower than the price.
+     */
+    private static final Document SKU_DISCOUNT = new Document("$cond", List.of(
+            new Document("$and", List.of(
+                    new Document("$isNumber", "$price"),
+                    new Document("$isNumber", "$salePrice"),
+                    new Document("$gt", List.of("$price", 0)),
+                    new Document("$lt", List.of("$salePrice", "$price")))),
+            new Document("$multiply", List.of(
+                    new Document("$divide", List.of(new Document("$subtract", List.of("$price", "$salePrice")), "$price")),
+                    100)),
+            0));
+
+    /** By the largest SKU discount (as in the summary), products without a discount last, then newest first. */
+    private static List<Document> byDiscount(boolean publicOnly) {
+        List<Document> skuPipeline = new ArrayList<>(skuStages(publicOnly));
+        skuPipeline.add(new Document("$group", new Document("_id", null).append("discount", new Document("$max", SKU_DISCOUNT))));
+        return List.of(
+                new Document("$lookup", new Document("from", SkuDocument.COLLECTION).append("localField", "_id")
+                        .append("foreignField", "productId").append("pipeline", skuPipeline).append("as", "_discounts")),
+                new Document("$addFields", new Document("_discount",
+                        new Document("$ifNull", List.of(new Document("$max", "$_discounts.discount"), 0)))),
+                new Document("$sort", new Document("_discount", -1).append("createdAt", -1).append("_id", -1)));
+    }
 
     private List<ProductDocument> aggregatePage(Criteria criteria, List<Document> sortStages, int limit, int offset) {
         List<AggregationOperation> stages = new ArrayList<>();
@@ -486,6 +551,9 @@ public class ProductRepository {
         if (filter.maxPrice() != null) {
             productIds = intersect(productIds, productIdsWithSku(
                     Criteria.where("effectivePrice").lte(MongoValues.decimal(filter.maxPrice())), filter.publicOnly()));
+        }
+        if (filter.minDiscountPercent() != null) {
+            productIds = intersect(productIds, productIdsWithDiscount(filter.minDiscountPercent(), filter.publicOnly()));
         }
         if (productIds != null) {
             if (productIds.isEmpty()) return null;

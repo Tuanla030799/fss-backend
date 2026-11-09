@@ -136,7 +136,7 @@ class ApiContractIntegrationTest extends MongoIntegrationTest {
         assertEquals(List.of(cheap), ids(list + "&sort=price_asc&maxPrice=120"));
 
         JsonNode invalid = error(get(list + "&sort=cheapest"), 400, "VALIDATION_ERROR");
-        assertEquals("sort must be one of: featured, newest, price_asc, price_desc, name_asc", invalid.get("message").asText());
+        assertEquals("sort must be one of: featured, newest, price_asc, price_desc, name_asc, discount_desc", invalid.get("message").asText());
     }
 
     @Test
