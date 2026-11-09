@@ -43,7 +43,8 @@ public class BannerService {
         UUID id = UUID.randomUUID();
         support.activateFile(request.fileId());
         support.activateFile(request.mobileFileId());
-        repository.insertBanner(id, request.title(), request.subtitle(), request.linkUrl(), request.fileId(),
+        repository.insertBanner(id, request.title(), request.subtitle(), support.trimToNull(request.linkUrl()),
+                support.trimToNull(request.pdfUrl()), request.fileId(),
                 request.mobileFileId(), support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
                 support.nz(request.sortOrder()), request.startsAt(), request.endsAt(), support.adminId());
         return id;
@@ -55,7 +56,8 @@ public class BannerService {
         support.requireFound(existing != null, ErrorCode.BANNER_NOT_FOUND, "Banner not found");
         support.activateFile(request.fileId());
         support.activateFile(request.mobileFileId());
-        repository.updateBanner(id, request.title(), request.subtitle(), request.linkUrl(), request.fileId(),
+        repository.updateBanner(id, request.title(), request.subtitle(), support.trimToNull(request.linkUrl()),
+                support.trimToNull(request.pdfUrl()), request.fileId(),
                 request.mobileFileId(), support.normalizeStatusDefault(request.status(), EcommerceSupport.ACTIVE),
                 support.nz(request.sortOrder()), request.startsAt(), request.endsAt(), support.adminId());
         fileReferenceService.releaseFiles(Arrays.asList(existing.fileId(), existing.mobileFileId()));
@@ -71,7 +73,7 @@ public class BannerService {
 
     private LandingBanner withBannerUrl(LandingBanner banner) {
         return banner == null ? null : new LandingBanner(banner.id(), banner.title(), banner.subtitle(), banner.linkUrl(),
-                banner.fileId(), publicUrlOrNull(banner.imageUrl()), banner.mobileFileId(),
+                banner.pdfUrl(), banner.fileId(), publicUrlOrNull(banner.imageUrl()), banner.mobileFileId(),
                 publicUrlOrNull(banner.mobileImageUrl()), banner.status(), banner.sortOrder(), banner.startsAt(),
                 banner.endsAt(), banner.createdAt());
     }

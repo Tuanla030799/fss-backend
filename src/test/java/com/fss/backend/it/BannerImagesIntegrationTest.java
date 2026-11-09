@@ -65,6 +65,21 @@ class BannerImagesIntegrationTest extends MongoIntegrationTest {
         assertTrue(banner.get("mobileImageUrl").isNull(), banner.toString());
     }
 
+    @Test
+    void buttonLinksAreStoredAndBlankLinksBecomeNull() throws Exception {
+        Map<String, Object> body = new HashMap<>(Map.of("title", unique("Links"), "linkUrl", "/products",
+                "pdfUrl", " https://example.com/catalog.pdf "));
+        String id = body(mvc.perform(admin(jsonBody(post("/api/admin/landing-banners"), body)))
+                .andExpect(status().isOk()).andReturn()).get("data").get("id").asText();
+        JsonNode banner = publicBanner(id);
+        assertEquals("/products", banner.get("linkUrl").asText());
+        assertEquals("https://example.com/catalog.pdf", banner.get("pdfUrl").asText());
+
+        body.put("pdfUrl", "  ");
+        mvc.perform(admin(jsonBody(put("/api/admin/landing-banners/" + id), body))).andExpect(status().isOk());
+        assertTrue(publicBanner(id).get("pdfUrl").isNull());
+    }
+
     private JsonNode publicBanner(String id) throws Exception {
         JsonNode items = body(mvc.perform(get("/api/landing-banners?limit=100")).andExpect(status().isOk()).andReturn())
                 .get("data").get("items");
