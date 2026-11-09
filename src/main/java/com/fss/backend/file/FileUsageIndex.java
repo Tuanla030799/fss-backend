@@ -26,6 +26,7 @@ public class FileUsageIndex {
     static final String BLOG_POSTS = "blog_posts";
     static final String SITE_PAGES = "site_pages";
     static final String FAQS = "faqs";
+    static final String CUSTOMER_FEEDBACKS = "customer_feedbacks";
     static final List<String> HTML_COLLECTIONS = List.of(PRODUCTS, COLLECTIONS, BLOG_POSTS, SITE_PAGES, FAQS);
 
     private final MongoTemplate mongo;
@@ -43,6 +44,7 @@ public class FileUsageIndex {
             if (exists(BANNERS, live().orOperator(Criteria.where("fileId").is(id), Criteria.where("mobileFileId").is(id)))) return true;
             if (exists(COLLECTIONS, live().and("fileId").is(id))) return true;
             if (exists(BLOG_POSTS, live().and("coverFileId").is(id))) return true;
+            if (exists(CUSTOMER_FEEDBACKS, live().and("fileId").is(id))) return true;
         }
         return hasLiveHtmlReference(path);
     }
@@ -59,6 +61,7 @@ public class FileUsageIndex {
             if (exists(BANNERS, new Criteria().orOperator(Criteria.where("fileId").is(id), Criteria.where("mobileFileId").is(id)))) return true;
             if (exists(COLLECTIONS, Criteria.where("fileId").is(id))) return true;
             if (exists(BLOG_POSTS, Criteria.where("coverFileId").is(id))) return true;
+            if (exists(CUSTOMER_FEEDBACKS, Criteria.where("fileId").is(id))) return true;
         }
         return hasLiveHtmlReference(path);
     }

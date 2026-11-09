@@ -55,6 +55,7 @@ public enum ErrorCode {
     BANNER_NOT_FOUND,
     SITE_PAGE_NOT_FOUND,
     FAQ_NOT_FOUND,
+    CUSTOMER_FEEDBACK_NOT_FOUND,
 
     // Files
     FILE_NOT_FOUND,
