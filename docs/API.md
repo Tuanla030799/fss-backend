@@ -49,7 +49,7 @@ Nguồn: `src/main/java/com/fss/backend/common/ErrorCode.java`.
 | Chung | `BAD_REQUEST`, `VALIDATION_ERROR`, `INVALID_REQUEST_BODY`, `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `NOT_ACCEPTABLE`, `UNSUPPORTED_MEDIA_TYPE`, `CONFLICT`, `CONCURRENT_UPDATE`, `DUPLICATE_VALUE`, `PAYLOAD_TOO_LARGE`, `TOO_MANY_REQUESTS`, `ACCESS_DENIED`, `SERVICE_UNAVAILABLE`, `INTERNAL_ERROR` |
 | Xác thực | `AUTH_REQUIRED`, `AUTH_TOKEN_INVALID`, `AUTH_INVALID_CREDENTIALS`, `AUTH_REFRESH_TOKEN_INVALID`, `AUTH_REGISTRATION_DISABLED`, `ADMIN_USER_NOT_FOUND`, `EMAIL_ALREADY_EXISTS` |
 | Catalog | `PRODUCT_NOT_FOUND`, `VARIANT_NOT_FOUND`, `SKU_NOT_FOUND`, `CATEGORY_NOT_FOUND`, `BRAND_NOT_FOUND`, `SIZE_NOT_FOUND`, `SIZE_INACTIVE`, `DEFAULT_SIZE_NOT_CONFIGURED`, `COLOR_NOT_FOUND`, `COLOR_INACTIVE`, `SLUG_ALREADY_EXISTS`, `SKU_CODE_ALREADY_EXISTS`, `SIZE_ALREADY_EXISTS`, `COLOR_ALREADY_EXISTS` |
-| Nội dung | `BLOG_POST_NOT_FOUND`, `COLLECTION_NOT_FOUND`, `BANNER_NOT_FOUND`, `SITE_PAGE_NOT_FOUND`, `FAQ_NOT_FOUND` |
+| Nội dung | `BLOG_POST_NOT_FOUND`, `COLLECTION_NOT_FOUND`, `BANNER_NOT_FOUND`, `SITE_PAGE_NOT_FOUND`, `FAQ_NOT_FOUND`, `CUSTOMER_FEEDBACK_NOT_FOUND` |
 | File | `FILE_NOT_FOUND`, `FILE_UNAVAILABLE`, `FILE_EMPTY`, `FILE_TYPE_NOT_SUPPORTED`, `FILE_TOO_LARGE`, `IMAGE_TOO_LARGE`, `IMAGE_CORRUPTED`, `STORAGE_UNAVAILABLE`, `SERVER_BUSY` |
 | Khách hàng, đơn hàng | `CUSTOMER_NOT_FOUND`, `PHONE_ALREADY_EXISTS`, `ORDER_NOT_FOUND`, `SKU_UNAVAILABLE`, `OUT_OF_STOCK` |
 | Mã giảm giá | `COUPON_NOT_FOUND`, `COUPON_INVALID`, `COUPON_NOT_STARTED`, `COUPON_EXPIRED`, `COUPON_USAGE_LIMIT_REACHED`, `COUPON_MIN_SUBTOTAL`, `COUPON_CODE_ALREADY_EXISTS` |
@@ -84,14 +84,24 @@ Chỉ hai endpoint trả mảng thường (`data: [...]`): `GET /products/featur
 | `featured` | Sản phẩm nổi bật trước (theo `featuredOrder` tăng dần), sau đó mới nhất |
 | `price_asc` / `price_desc` | Theo giá bán thấp nhất (giá sale nếu có, không thì giá gốc). Sản phẩm chưa có giá luôn xếp cuối. |
 | `name_asc` | Theo tên. Collation tiếng Việt, không phân biệt hoa thường, so số theo giá trị (`B9` đứng trước `b10`). |
+| `discount_desc` | Theo `maxDiscountPercent` giảm dần. Sản phẩm không giảm giá xếp cuối. |
 
 - Server sắp xếp **toàn bộ** kết quả đã lọc rồi mới phân trang.
 - Không phân biệt hoa thường, và chấp nhận cả `-` thay cho `_` (`price-asc`).
 - Giá trị khác trả 400 `VALIDATION_ERROR`.
 - Trang danh sách muốn mặc định "nổi bật" thì FE phải gửi `sort=featured`.
 
-Các bộ lọc khác: `categoryId`, `categorySlug`, `brandId`, `brandSlug`, `gender`, `keyword`, `size`, `color`, `minPrice`, `maxPrice`.
+Các bộ lọc khác: `categoryId`, `categorySlug`, `brandId`, `brandSlug`, `gender`, `keyword`, `size`, `color`, `minPrice`, `maxPrice`, `minDiscount`.
 - `minPrice`/`maxPrice` so với giá bán (giá sale nếu có).
+- `minDiscount` (1–100): chỉ lấy sản phẩm có ít nhất một SKU giảm từ chừng ấy phần trăm trở lên. VD mục "đang sale
+  mạnh" ở trang chủ: `GET /products?minDiscount=20&sort=discount-desc`.
+
+### `maxDiscountPercent`
+
+Summary sản phẩm (danh sách, `/products/featured`, bộ sưu tập) có `maxDiscountPercent`:
+- Mức giảm lớn nhất (phần trăm nguyên, làm tròn xuống) trong các SKU được tính, `0` khi không SKU nào giảm giá.
+- Mỗi size có thể có giá riêng, nên `minPrice` và `minSalePrice` có thể thuộc hai SKU khác nhau. Hiển thị phần trăm
+  giảm thì dùng `maxDiscountPercent`, đừng tự tính từ hai giá đó.
 
 ### `updatedAt`
 
@@ -121,6 +131,7 @@ Nội dung khác:
 - Banner: `ACTIVE`, đang trong khoảng `startsAt`–`endsAt`.
 - Bộ sưu tập: `ACTIVE`.
 - FAQ: `ACTIVE`.
+- Ảnh feedback khách hàng: `ACTIVE`.
 
 ## 6. Mã giảm giá: `POST /coupons/validate`
 
@@ -267,3 +278,26 @@ Các trang tĩnh do admin soạn. Danh sách khoá cố định:
 - Không có ảnh mobile thì `mobileFileId` và `mobileImageUrl` là `null`; FE tự cắt ảnh desktop.
 - Ảnh mobile theo cùng vòng đời file với ảnh desktop: được kích hoạt khi lưu, giải phóng khi bị thay hoặc
   khi xoá banner.
+- Hai nút trên banner: `linkUrl` là nút "Buy now", `pdfUrl` là nút "Download a PDF". Cả hai tuỳ chọn; chuỗi rỗng
+  được lưu thành `null`. Banner tạo trước khi có `pdfUrl` trả `null`.
+
+## 13. Ảnh feedback khách hàng: `/customer-feedbacks`
+
+```json
+{ "id": "…", "fileId": "…", "imageUrl": "https://…", "customerName": null, "description": null, "sortOrder": 0,
+  "status": "ACTIVE", "createdAt": "…", "updatedAt": "…" }
+```
+
+| Endpoint | Ghi chú |
+|---|---|
+| `GET /customer-feedbacks?page=&limit=` | Public, chỉ ảnh `ACTIVE`. |
+| `GET /admin/customer-feedbacks?status=&page=&limit=` | `status` là `ACTIVE`/`INACTIVE`. |
+| `GET /admin/customer-feedbacks/{id}` | |
+| `POST /admin/customer-feedbacks` | Body `{ fileId, customerName, description, sortOrder, status }`. Trả `{ "id": "…" }`. |
+| `PUT /admin/customer-feedbacks/{id}` | Cùng body với `POST`. |
+| `DELETE /admin/customer-feedbacks/{id}` | Xoá mềm, giải phóng ảnh. |
+
+- `fileId` bắt buộc. Thường chỉ có ảnh: `customerName` (≤ 120 ký tự) và `description` (văn bản thường, ≤ 1000
+  ký tự) tuỳ chọn, chuỗi rỗng lưu thành `null`.
+- Sắp xếp theo `sortOrder` tăng dần, rồi mới nhất trước. `sortOrder` mặc định `0`, `status` mặc định `ACTIVE`.
+- Id không tồn tại hoặc đã xoá trả 404 `CUSTOMER_FEEDBACK_NOT_FOUND`.
